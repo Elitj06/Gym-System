@@ -1,0 +1,241 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # BANCO DE DADOS
+  # ==========================================
+  
+  postgres:
+    image: postgres:14-alpine
+    container_name: gym-postgres
+    environment:
+      POSTGRES_DB: gym_db
+      POSTGRES_USER: gym_user
+      POSTGRES_PASSWORD: gym_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - gym-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gym_user -d gym_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: gym-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - gym-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  mongodb:
+    image: mongo:6
+    container_name: gym-mongodb
+    environment:
+      MONGO_INITDB_DATABASE: gym_analytics
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - gym-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/gym_analytics --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # BACKEND API
+  # ==========================================
+  
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: gym-backend
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=postgresql://gym_user:gym_password@postgres:5432/gym_db
+      - REDIS_URL=redis://redis:6379
+      - MONGO_URL=mongodb://mongodb:27017/gym_analytics
+      - AI_VISION_URL=http://ai-vision:5000
+      - JWT_SECRET=${JWT_SECRET}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - gym-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==========================================
+  # AI VISION SERVICE
+  # ==========================================
+  
+  ai-vision:
+    build:
+      context: ./ai-vision
+      dockerfile: Dockerfile
+    container_name: gym-ai-vision
+    environment:
+      - FLASK_ENV=production
+      - PORT=5000
+      - REDIS_URL=redis://redis:6379
+      - MONGO_URL=mongodb://mongodb:27017/gym_analytics
+      - CONFIDENCE_THRESHOLD=0.7
+    ports:
+      - "5000:5000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    volumes:
+      - ./ai-vision:/app
+      - ai_models:/app/models
+    networks:
+      - gym-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+
+  # ==========================================
+  # WEB DASHBOARD
+  # ==========================================
+  
+  web-dashboard:
+    build:
+      context: ./web-dashboard
+      dockerfile: Dockerfile
+    container_name: gym-web-dashboard
+    environment:
+      - REACT_APP_API_URL=http://localhost:3000
+      - REACT_APP_WS_URL=ws://localhost:3000
+    ports:
+      - "3001:80"
+    depends_on:
+      - backend
+    networks:
+      - gym-network
+    restart: unless-stopped
+
+  # ==========================================
+  # NGINX (Load Balancer & Reverse Proxy)
+  # ==========================================
+  
+  nginx:
+    image: nginx:alpine
+    container_name: gym-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infrastructure/nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+      - web-dashboard
+    networks:
+      - gym-network
+    restart: unless-stopped
+
+  # ==========================================
+  # MONITORAMENTO
+  # ==========================================
+  
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: gym-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - gym-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: gym-grafana
+    ports:
+      - "3002:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./infrastructure/grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    networks:
+      - gym-network
+    restart: unless-stopped
+
+# ==========================================
+# VOLUMES
+# ==========================================
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  mongo_data:
+    driver: local
+  ai_models:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+# ==========================================
+# NETWORKS
+# ==========================================
+
+networks:
+  gym-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
