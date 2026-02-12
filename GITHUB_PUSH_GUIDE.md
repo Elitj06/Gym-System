@@ -1,15 +1,16 @@
 # 🚀 Guia Rápido - Push para GitHub
 
 ## Repositório Destino
-**https://github.com/Elitj06/Gym-Sisten.git**
+**https://github.com/Elitj06/Gym-System.git**
 
 ---
 
 ## 📋 Opção 1: Usando o Script Automático (RECOMENDADO)
 
 ```bash
-# 1. Entre no diretório do projeto
-cd gym-ai-system
+# 1. Clone o repositório (se ainda não tiver)
+git clone https://github.com/Elitj06/Gym-System.git
+cd Gym-System
 
 # 2. Execute o script
 ./push-to-github.sh
@@ -30,10 +31,10 @@ O script irá:
 ## 📋 Opção 2: Comandos Manuais
 
 ```bash
-# 1. Entre no diretório
-cd gym-ai-system
+# 1. Entre no diretório do repositório (raiz do projeto)
+cd Gym-System
 
-# 2. Inicialize o repositório Git
+# 2. Inicialize o repositório Git (apenas se for um projeto novo)
 git init
 
 # 3. Configure suas informações (se ainda não configurou)
@@ -41,7 +42,7 @@ git config user.name "Seu Nome"
 git config user.email "seu.email@example.com"
 
 # 4. Adicione o remote
-git remote add origin https://github.com/Elitj06/Gym-Sisten.git
+git remote add origin https://github.com/Elitj06/Gym-System.git
 
 # 5. Crie branch main
 git branch -M main
@@ -90,7 +91,7 @@ ssh-keygen -t ed25519 -C "seu.email@example.com"
 
 3. **Alterar URL do remote:**
 ```bash
-git remote set-url origin git@github.com:Elitj06/Gym-Sisten.git
+git remote set-url origin git@github.com:Elitj06/Gym-System.git
 git push -u origin main
 ```
 
@@ -182,7 +183,7 @@ git rm -r --cached ai-vision/models/*.h5
 Após fazer o push:
 
 1. **Acesse o repositório:**
-   https://github.com/Elitj06/Gym-Sisten
+   https://github.com/Elitj06/Gym-System
 
 2. **Verifique:**
    - ✅ README.md aparece formatado

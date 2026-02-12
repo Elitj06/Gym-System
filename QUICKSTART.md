@@ -25,8 +25,8 @@ Antes de começar, certifique-se de ter instalado:
 
 ```bash
 # 1. Clone o repositório (se ainda não fez)
-git clone https://github.com/Elitj06/Gym-Sisten.git
-cd Gym-Sisten
+git clone https://github.com/Elitj06/Gym-System.git
+cd Gym-System
 
 # 2. Configure as variáveis de ambiente
 cp .env.example .env
@@ -219,7 +219,7 @@ docker-compose restart postgres redis mongodb
 - [Documentação Completa](README.md)
 - [Guia de API](docs/API.md)
 - [Guia de Deploy](docs/DEPLOYMENT.md)
-- [GitHub Issues](https://github.com/Elitj06/Gym-Sisten/issues)
+- [GitHub Issues](https://github.com/Elitj06/Gym-System/issues)
 
 ## 💡 Dicas
 

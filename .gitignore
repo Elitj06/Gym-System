@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+.venv/
+env/
+.env.local
+.env.*.local
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+.eggs/
+*.egg
+
+# Logs and temp
+tmp/
+temp/
+*.log
+logs/
+.cache/
+
+# Environment and secrets (never commit real .env)
+.env
+.env.production
+.env.development
+
+# AI models (muito grandes - baixar separadamente)
+ai-vision/models/*.h5
+ai-vision/models/*.pb
+ai-vision/models/*.onnx
+
+# Backups
+*.bak
+*.backup
+database/backups/
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Certificates and keys
+*.pem
+*.key
+*.crt
+infrastructure/nginx/ssl/*
+
+# IDE
+.idea/
+.vscode/
+*.sublime-*
+
+# Coverage and test
+coverage/
+.nyc_output/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Misc
+*.tgz
+.npm
+.eslintcache

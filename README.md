@@ -75,8 +75,8 @@ Sistema completo de gestão inteligente para academias com detecção de poses e
 
 ```bash
 # Clone o repositório
-git clone https://github.com/Elitj06/Gym-Sisten.git
-cd Gym-Sisten
+git clone https://github.com/Elitj06/Gym-System.git
+cd Gym-System
 
 # Configure variáveis de ambiente
 cp .env.example .env
@@ -299,8 +299,8 @@ Este projeto está sob a licença MIT. Veja [LICENSE](LICENSE) para mais detalhe
 ## 📞 Suporte
 
 - Email: elitjader@gmail.com
-- Issues: [GitHub Issues](https://github.com/Elitj06/Gym-Sisten/issues)
-- Docs: [Documentação Online](https://github.com/Elitj06/Gym-Sisten/wiki)
+- Issues: [GitHub Issues](https://github.com/Elitj06/Gym-System/issues)
+- Docs: [Documentação Online](https://github.com/Elitj06/Gym-System/wiki)
 
 ## 🗺️ Roadmap
 

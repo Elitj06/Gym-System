@@ -247,7 +247,7 @@ terraform apply
 ## Estrutura de Diretórios
 
 ```
-gym-ai-system/
+Gym-System/                    # Raiz do repositório
 ├── backend/              # API Backend
 │   ├── src/
 │   │   ├── controllers/
