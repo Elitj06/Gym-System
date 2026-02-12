@@ -4,6 +4,8 @@
 ![Version](https://img.shields.io/badge/version-1.0.0-green.svg)
 ![Status](https://img.shields.io/badge/status-production--ready-success.svg)
 
+> **Não é programador e quer colocar no ar?** Siga o guia **[COMECE_AQUI_DEPLOY.md](COMECE_AQUI_DEPLOY.md)** – passo a passo em português, sem código.
+
 ## 🎯 Visão Geral
 
 Sistema completo de gestão inteligente para academias com detecção de poses em tempo real, análise de exercícios com IA, alertas inteligentes, analytics avançado e dashboard interativo.
