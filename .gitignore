@@ -28,6 +28,7 @@ logs/
 .env
 .env.production
 .env.development
+.env.deploy
 
 # AI models (muito grandes - baixar separadamente)
 ai-vision/models/*.h5

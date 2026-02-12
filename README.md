@@ -4,7 +4,8 @@
 ![Version](https://img.shields.io/badge/version-1.0.0-green.svg)
 ![Status](https://img.shields.io/badge/status-production--ready-success.svg)
 
-> **Não é programador e quer colocar no ar?** Siga o guia **[COMECE_AQUI_DEPLOY.md](COMECE_AQUI_DEPLOY.md)** – passo a passo em português, sem código.
+> **Não é programador e quer colocar no ar?** Siga o guia **[COMECE_AQUI_DEPLOY.md](COMECE_AQUI_DEPLOY.md)** – passo a passo em português, sem código.  
+> **Quer dar acesso por API para eu executar o deploy por si?** Siga **[COMO_DAR_ACESSO_VIA_API.md](COMO_DAR_ACESSO_VIA_API.md)** – cria tokens, cola no `.env.deploy` e diga "pode executar".
 
 ## 🎯 Visão Geral
 
