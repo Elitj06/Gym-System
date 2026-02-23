@@ -1,0 +1,157 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Modelo de Planos
+model Plan {
+  id          String   @id @default(cuid())
+  name        String
+  price       Decimal  @db.Decimal(10, 2)
+  duration    Int      // Duração em dias (30, 90, 365)
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members     Member[]
+
+  @@map("plans")
+}
+
+// Modelo de Membros
+model Member {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  cpf           String    @unique
+  phone         String
+  birthDate     DateTime
+  gender        String    // 'M', 'F', 'Outro'
+  photoUrl      String?
+  address       String?
+  city          String?
+  state         String?
+  zipCode       String?
+  
+  // Dados da Matrícula
+  enrollmentDate DateTime  @default(now())
+  status        String    @default("active") // active, inactive, suspended
+  planId        String
+  plan          Plan      @relation(fields: [planId], references: [id])
+  
+  // Pagamento
+  paymentDay    Int       // Dia do mês para pagamento (1-31)
+  lastPayment   DateTime?
+  nextPayment   DateTime?
+  
+  // Biometria e Acesso
+  biometricId   String?   @unique
+  accessPin     String?
+  
+  // Auditoria
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  payments      Payment[]
+  accessLogs    AccessLog[]
+
+  @@map("members")
+}
+
+// Modelo de Funcionários
+model Employee {
+  id          String   @id @default(cuid())
+  name        String
+  email       String   @unique
+  cpf         String   @unique
+  phone       String
+  birthDate   DateTime
+  photoUrl    String?
+  
+  // Dados Profissionais
+  role        String   // 'admin', 'instructor', 'receptionist', 'cleaner'
+  salary      Decimal  @db.Decimal(10, 2)
+  hireDate    DateTime
+  status      String   @default("active") // active, inactive, on_vacation
+  
+  // Credenciais
+  accessPin   String?
+  permissions String[] // Array de permissões
+  
+  // Auditoria
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  schedules   Schedule[]
+
+  @@map("employees")
+}
+
+// Modelo de Pagamentos
+model Payment {
+  id          String   @id @default(cuid())
+  memberId    String
+  member      Member   @relation(fields: [memberId], references: [id])
+  
+  amount      Decimal  @db.Decimal(10, 2)
+  dueDate     DateTime
+  paidAt      DateTime?
+  status      String   @default("pending") // pending, paid, overdue, cancelled
+  
+  method      String?  // cash, credit_card, debit_card, pix, bank_transfer
+  reference   String?  // Número do comprovante/transação
+  notes       String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("payments")
+}
+
+// Modelo de Logs de Acesso
+model AccessLog {
+  id          String   @id @default(cuid())
+  memberId    String
+  member      Member   @relation(fields: [memberId], references: [id])
+  
+  checkIn     DateTime @default(now())
+  checkOut    DateTime?
+  
+  method      String   // 'biometric', 'pin', 'card', 'manual'
+  location    String?  // Área da academia
+  
+  createdAt   DateTime @default(now())
+
+  @@map("access_logs")
+}
+
+// Modelo de Horários de Aulas
+model Schedule {
+  id          String   @id @default(cuid())
+  name        String   // Nome da aula/atividade
+  description String?
+  
+  instructorId String
+  instructor   Employee @relation(fields: [instructorId], references: [id])
+  
+  dayOfWeek   Int      // 0-6 (Domingo-Sábado)
+  startTime   String   // HH:MM
+  endTime     String   // HH:MM
+  
+  maxCapacity Int
+  location    String   // Sala/Área
+  
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("schedules")
+}
