@@ -6,21 +6,38 @@ import { prisma } from '@/lib/prisma'
 
 export async function POST(request: Request) {
   try {
+    // Log para debug
+    console.log('📥 Recebendo requisição POST em /api/seed')
+    
     // Proteção básica com senha
-    const { password } = await request.json()
+    const body = await request.json()
+    console.log('📦 Body recebido:', { hasPassword: !!body.password })
+    
+    const { password } = body
     
     if (password !== 'GymSystem2026!') {
+      console.log('❌ Senha incorreta')
       return NextResponse.json(
         { error: 'Unauthorized - Invalid password' },
         { status: 401 }
       )
     }
 
+    console.log('✅ Senha correta')
+    console.log('🔍 Verificando DATABASE_URL:', {
+      exists: !!process.env.DATABASE_URL,
+      length: process.env.DATABASE_URL?.length || 0
+    })
+
     console.log('🌱 Starting database seed...')
 
     // Verificar se já foi executado
+    console.log('🔍 Contando planos existentes...')
     const existingPlans = await prisma.plan.count()
+    console.log(`📊 Planos encontrados: ${existingPlans}`)
+    
     if (existingPlans > 0) {
+      console.log('⚠️  Database already seeded')
       return NextResponse.json({
         message: 'Database already seeded',
         plans: existingPlans,
@@ -182,9 +199,18 @@ export async function POST(request: Request) {
 // GET para verificar status
 export async function GET() {
   try {
+    console.log('📥 GET /api/seed - Verificando status')
+    console.log('🔍 DATABASE_URL:', {
+      exists: !!process.env.DATABASE_URL,
+      length: process.env.DATABASE_URL?.length || 0
+    })
+    
+    console.log('🔍 Contando registros...')
     const plans = await prisma.plan.count()
     const members = await prisma.member.count()
     const employees = await prisma.employee.count()
+    
+    console.log(`📊 Contagem: ${plans} planos, ${members} membros, ${employees} funcionários`)
     
     return NextResponse.json({
       status: 'Database connection OK',
@@ -196,10 +222,15 @@ export async function GET() {
       },
     })
   } catch (error: any) {
+    console.error('❌ Erro no GET /api/seed:', error)
     return NextResponse.json(
       { 
         error: 'Database connection failed',
-        details: error.message 
+        details: error.message,
+        env: {
+          hasDatabaseUrl: !!process.env.DATABASE_URL,
+          nodeEnv: process.env.NODE_ENV
+        }
       },
       { status: 500 }
     )
