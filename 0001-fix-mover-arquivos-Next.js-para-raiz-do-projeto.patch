@@ -1,0 +1,186 @@
+From f452d25af5493b1ed961844ce48052d7b27463a3 Mon Sep 17 00:00:00 2001
+From: GymSystem <admin@gymsystem.com>
+Date: Sun, 22 Feb 2026 20:34:23 +0000
+Subject: [PATCH] fix: mover arquivos Next.js para raiz do projeto
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- Reorganiza estrutura movendo todos os arquivos de web-dashboard/ para raiz
+- Resolve erro 404 no Vercel devido à estrutura de subdiretório
+- Mantém todas as funcionalidades e configurações existentes
+- Build local testado e aprovado
+---
+ web-dashboard/next-env.d.ts => next-env.d.ts                      | 0
+ web-dashboard/next.config.js => next.config.js                    | 0
+ web-dashboard/package-lock.json => package-lock.json              | 0
+ web-dashboard/package.json => package.json                        | 0
+ web-dashboard/postcss.config.js => postcss.config.js              | 0
+ {web-dashboard/src => src}/app/dashboard/page.tsx                 | 0
+ {web-dashboard/src => src}/app/espacos/page.tsx                   | 0
+ {web-dashboard/src => src}/app/financeiro/page.tsx                | 0
+ {web-dashboard/src => src}/app/funcionarios/page.tsx              | 0
+ {web-dashboard/src => src}/app/globals.css                        | 0
+ {web-dashboard/src => src}/app/ia/page.tsx                        | 0
+ {web-dashboard/src => src}/app/layout.tsx                         | 0
+ {web-dashboard/src => src}/app/membros/page.tsx                   | 0
+ {web-dashboard/src => src}/app/page.tsx                           | 0
+ {web-dashboard/src => src}/app/relatorios/page.tsx                | 0
+ {web-dashboard/src => src}/app/treinos/page.tsx                   | 0
+ {web-dashboard/src => src}/components/dashboard/ActivityFeed.tsx  | 0
+ {web-dashboard/src => src}/components/dashboard/KpiCard.tsx       | 0
+ .../src => src}/components/dashboard/OccupancyChart.tsx           | 0
+ {web-dashboard/src => src}/components/dashboard/PlansOverview.tsx | 0
+ {web-dashboard/src => src}/components/dashboard/RevenueChart.tsx  | 0
+ {web-dashboard/src => src}/components/layout/Sidebar.tsx          | 0
+ {web-dashboard/src => src}/components/layout/Topbar.tsx           | 0
+ {web-dashboard/src => src}/components/ui/ModuleShell.tsx          | 0
+ {web-dashboard/src => src}/data/mock.ts                           | 0
+ web-dashboard/tailwind.config.js => tailwind.config.js            | 0
+ web-dashboard/tsconfig.json => tsconfig.json                      | 0
+ web-dashboard/vercel.json => vercel.json                          | 0
+ 28 files changed, 0 insertions(+), 0 deletions(-)
+ rename web-dashboard/next-env.d.ts => next-env.d.ts (100%)
+ rename web-dashboard/next.config.js => next.config.js (100%)
+ rename web-dashboard/package-lock.json => package-lock.json (100%)
+ rename web-dashboard/package.json => package.json (100%)
+ rename web-dashboard/postcss.config.js => postcss.config.js (100%)
+ rename {web-dashboard/src => src}/app/dashboard/page.tsx (100%)
+ rename {web-dashboard/src => src}/app/espacos/page.tsx (100%)
+ rename {web-dashboard/src => src}/app/financeiro/page.tsx (100%)
+ rename {web-dashboard/src => src}/app/funcionarios/page.tsx (100%)
+ rename {web-dashboard/src => src}/app/globals.css (100%)
+ rename {web-dashboard/src => src}/app/ia/page.tsx (100%)
+ rename {web-dashboard/src => src}/app/layout.tsx (100%)
+ rename {web-dashboard/src => src}/app/membros/page.tsx (100%)
+ rename {web-dashboard/src => src}/app/page.tsx (100%)
+ rename {web-dashboard/src => src}/app/relatorios/page.tsx (100%)
+ rename {web-dashboard/src => src}/app/treinos/page.tsx (100%)
+ rename {web-dashboard/src => src}/components/dashboard/ActivityFeed.tsx (100%)
+ rename {web-dashboard/src => src}/components/dashboard/KpiCard.tsx (100%)
+ rename {web-dashboard/src => src}/components/dashboard/OccupancyChart.tsx (100%)
+ rename {web-dashboard/src => src}/components/dashboard/PlansOverview.tsx (100%)
+ rename {web-dashboard/src => src}/components/dashboard/RevenueChart.tsx (100%)
+ rename {web-dashboard/src => src}/components/layout/Sidebar.tsx (100%)
+ rename {web-dashboard/src => src}/components/layout/Topbar.tsx (100%)
+ rename {web-dashboard/src => src}/components/ui/ModuleShell.tsx (100%)
+ rename {web-dashboard/src => src}/data/mock.ts (100%)
+ rename web-dashboard/tailwind.config.js => tailwind.config.js (100%)
+ rename web-dashboard/tsconfig.json => tsconfig.json (100%)
+ rename web-dashboard/vercel.json => vercel.json (100%)
+
+diff --git a/web-dashboard/next-env.d.ts b/next-env.d.ts
+similarity index 100%
+rename from web-dashboard/next-env.d.ts
+rename to next-env.d.ts
+diff --git a/web-dashboard/next.config.js b/next.config.js
+similarity index 100%
+rename from web-dashboard/next.config.js
+rename to next.config.js
+diff --git a/web-dashboard/package-lock.json b/package-lock.json
+similarity index 100%
+rename from web-dashboard/package-lock.json
+rename to package-lock.json
+diff --git a/web-dashboard/package.json b/package.json
+similarity index 100%
+rename from web-dashboard/package.json
+rename to package.json
+diff --git a/web-dashboard/postcss.config.js b/postcss.config.js
+similarity index 100%
+rename from web-dashboard/postcss.config.js
+rename to postcss.config.js
+diff --git a/web-dashboard/src/app/dashboard/page.tsx b/src/app/dashboard/page.tsx
+similarity index 100%
+rename from web-dashboard/src/app/dashboard/page.tsx
+rename to src/app/dashboard/page.tsx
+diff --git a/web-dashboard/src/app/espacos/page.tsx b/src/app/espacos/page.tsx
+similarity index 100%
+rename from web-dashboard/src/app/espacos/page.tsx
+rename to src/app/espacos/page.tsx
+diff --git a/web-dashboard/src/app/financeiro/page.tsx b/src/app/financeiro/page.tsx
+similarity index 100%
+rename from web-dashboard/src/app/financeiro/page.tsx
+rename to src/app/financeiro/page.tsx
+diff --git a/web-dashboard/src/app/funcionarios/page.tsx b/src/app/funcionarios/page.tsx
+similarity index 100%
+rename from web-dashboard/src/app/funcionarios/page.tsx
+rename to src/app/funcionarios/page.tsx
+diff --git a/web-dashboard/src/app/globals.css b/src/app/globals.css
+similarity index 100%
+rename from web-dashboard/src/app/globals.css
+rename to src/app/globals.css
+diff --git a/web-dashboard/src/app/ia/page.tsx b/src/app/ia/page.tsx
+similarity index 100%
+rename from web-dashboard/src/app/ia/page.tsx
+rename to src/app/ia/page.tsx
+diff --git a/web-dashboard/src/app/layout.tsx b/src/app/layout.tsx
+similarity index 100%
+rename from web-dashboard/src/app/layout.tsx
+rename to src/app/layout.tsx
+diff --git a/web-dashboard/src/app/membros/page.tsx b/src/app/membros/page.tsx
+similarity index 100%
+rename from web-dashboard/src/app/membros/page.tsx
+rename to src/app/membros/page.tsx
+diff --git a/web-dashboard/src/app/page.tsx b/src/app/page.tsx
+similarity index 100%
+rename from web-dashboard/src/app/page.tsx
+rename to src/app/page.tsx
+diff --git a/web-dashboard/src/app/relatorios/page.tsx b/src/app/relatorios/page.tsx
+similarity index 100%
+rename from web-dashboard/src/app/relatorios/page.tsx
+rename to src/app/relatorios/page.tsx
+diff --git a/web-dashboard/src/app/treinos/page.tsx b/src/app/treinos/page.tsx
+similarity index 100%
+rename from web-dashboard/src/app/treinos/page.tsx
+rename to src/app/treinos/page.tsx
+diff --git a/web-dashboard/src/components/dashboard/ActivityFeed.tsx b/src/components/dashboard/ActivityFeed.tsx
+similarity index 100%
+rename from web-dashboard/src/components/dashboard/ActivityFeed.tsx
+rename to src/components/dashboard/ActivityFeed.tsx
+diff --git a/web-dashboard/src/components/dashboard/KpiCard.tsx b/src/components/dashboard/KpiCard.tsx
+similarity index 100%
+rename from web-dashboard/src/components/dashboard/KpiCard.tsx
+rename to src/components/dashboard/KpiCard.tsx
+diff --git a/web-dashboard/src/components/dashboard/OccupancyChart.tsx b/src/components/dashboard/OccupancyChart.tsx
+similarity index 100%
+rename from web-dashboard/src/components/dashboard/OccupancyChart.tsx
+rename to src/components/dashboard/OccupancyChart.tsx
+diff --git a/web-dashboard/src/components/dashboard/PlansOverview.tsx b/src/components/dashboard/PlansOverview.tsx
+similarity index 100%
+rename from web-dashboard/src/components/dashboard/PlansOverview.tsx
+rename to src/components/dashboard/PlansOverview.tsx
+diff --git a/web-dashboard/src/components/dashboard/RevenueChart.tsx b/src/components/dashboard/RevenueChart.tsx
+similarity index 100%
+rename from web-dashboard/src/components/dashboard/RevenueChart.tsx
+rename to src/components/dashboard/RevenueChart.tsx
+diff --git a/web-dashboard/src/components/layout/Sidebar.tsx b/src/components/layout/Sidebar.tsx
+similarity index 100%
+rename from web-dashboard/src/components/layout/Sidebar.tsx
+rename to src/components/layout/Sidebar.tsx
+diff --git a/web-dashboard/src/components/layout/Topbar.tsx b/src/components/layout/Topbar.tsx
+similarity index 100%
+rename from web-dashboard/src/components/layout/Topbar.tsx
+rename to src/components/layout/Topbar.tsx
+diff --git a/web-dashboard/src/components/ui/ModuleShell.tsx b/src/components/ui/ModuleShell.tsx
+similarity index 100%
+rename from web-dashboard/src/components/ui/ModuleShell.tsx
+rename to src/components/ui/ModuleShell.tsx
+diff --git a/web-dashboard/src/data/mock.ts b/src/data/mock.ts
+similarity index 100%
+rename from web-dashboard/src/data/mock.ts
+rename to src/data/mock.ts
+diff --git a/web-dashboard/tailwind.config.js b/tailwind.config.js
+similarity index 100%
+rename from web-dashboard/tailwind.config.js
+rename to tailwind.config.js
+diff --git a/web-dashboard/tsconfig.json b/tsconfig.json
+similarity index 100%
+rename from web-dashboard/tsconfig.json
+rename to tsconfig.json
+diff --git a/web-dashboard/vercel.json b/vercel.json
+similarity index 100%
+rename from web-dashboard/vercel.json
+rename to vercel.json
+-- 
+2.43.0
+
