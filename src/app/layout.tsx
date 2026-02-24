@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import Sidebar from '@/components/layout/Sidebar'
 import Topbar from '@/components/layout/Topbar'
+import AuthProvider from '@/components/providers/AuthProvider'
 
 export const metadata: Metadata = {
   title: 'GYM System - Gestão Inteligente de Academias',
@@ -16,13 +17,15 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className="bg-gym-bg text-gym-text antialiased">
-        <Sidebar />
-        <div className="ml-[240px] min-h-screen transition-all duration-300">
-          <Topbar />
-          <main className="p-6">
-            {children}
-          </main>
-        </div>
+        <AuthProvider>
+          <Sidebar />
+          <div className="ml-[240px] min-h-screen transition-all duration-300">
+            <Topbar />
+            <main className="p-6">
+              {children}
+            </main>
+          </div>
+        </AuthProvider>
       </body>
     </html>
   )
