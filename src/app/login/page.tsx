@@ -3,11 +3,12 @@
 import { signIn } from 'next-auth/react'
 import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Dumbbell, AlertCircle, Loader2 } from 'lucide-react'
+import { Dumbbell, AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react'
 
 function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -40,7 +41,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gym-dark via-black to-gym-dark relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gym-dark via-black to-gym-dark relative overflow-hidden p-4">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-5">
         <div className="absolute inset-0" style={{
@@ -50,30 +51,30 @@ function LoginForm() {
       </div>
 
       {/* Login Card */}
-      <div className="relative z-10 w-full max-w-md mx-4">
-        <div className="bg-gym-secondary border border-gym-border rounded-2xl shadow-2xl p-8">
+      <div className="relative z-10 w-full max-w-md">
+        <div className="bg-gym-secondary border border-gym-border rounded-2xl shadow-2xl p-6 sm:p-8">
           {/* Logo */}
-          <div className="flex flex-col items-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-gym-accent to-gym-accent/80 rounded-xl flex items-center justify-center mb-4 shadow-lg">
-              <Dumbbell className="w-10 h-10 text-black" />
+          <div className="flex flex-col items-center mb-6 sm:mb-8">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-gym-accent to-gym-accent/80 rounded-xl flex items-center justify-center mb-3 sm:mb-4 shadow-lg">
+              <Dumbbell className="w-8 h-8 sm:w-10 sm:h-10 text-black" />
             </div>
-            <h1 className="text-3xl font-bold text-white mb-2">GYM SYSTEM</h1>
-            <p className="text-gym-text-secondary text-sm">Sistema de Gestão de Academia</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">GYM SYSTEM</h1>
+            <p className="text-gym-text-secondary text-xs sm:text-sm text-center">Sistema de Gestão de Academia</p>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
             {/* Error Alert */}
             {error && (
-              <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-4 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                <p className="text-red-200 text-sm">{error}</p>
+              <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3 sm:p-4 flex items-start gap-2 sm:gap-3">
+                <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <p className="text-red-200 text-xs sm:text-sm">{error}</p>
               </div>
             )}
 
             {/* Email Input */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gym-text-secondary mb-2">
+              <label htmlFor="email" className="block text-xs sm:text-sm font-medium text-gym-text-secondary mb-2">
                 Email
               </label>
               <input
@@ -82,7 +83,8 @@ function LoginForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-3 bg-gym-dark border border-gym-border rounded-lg text-white placeholder-gym-text-secondary focus:outline-none focus:ring-2 focus:ring-gym-accent focus:border-transparent transition-all"
+                autoComplete="email"
+                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-gym-dark border border-gym-border rounded-lg text-white text-sm sm:text-base placeholder-gym-text-secondary focus:outline-none focus:ring-2 focus:ring-gym-accent focus:border-transparent transition-all"
                 placeholder="seu@email.com"
                 disabled={loading}
               />
@@ -90,30 +92,45 @@ function LoginForm() {
 
             {/* Password Input */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gym-text-secondary mb-2">
+              <label htmlFor="password" className="block text-xs sm:text-sm font-medium text-gym-text-secondary mb-2">
                 Senha
               </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="w-full px-4 py-3 bg-gym-dark border border-gym-border rounded-lg text-white placeholder-gym-text-secondary focus:outline-none focus:ring-2 focus:ring-gym-accent focus:border-transparent transition-all"
-                placeholder="••••••••"
-                disabled={loading}
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 pr-10 sm:pr-12 bg-gym-dark border border-gym-border rounded-lg text-white text-sm sm:text-base placeholder-gym-text-secondary focus:outline-none focus:ring-2 focus:ring-gym-accent focus:border-transparent transition-all"
+                  placeholder="••••••••"
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gym-text-secondary hover:text-white transition-colors"
+                  disabled={loading}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" />
+                  ) : (
+                    <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-gym-accent to-gym-accent/90 text-black font-semibold py-3 px-4 rounded-lg hover:from-gym-accent/90 hover:to-gym-accent/80 focus:outline-none focus:ring-2 focus:ring-gym-accent focus:ring-offset-2 focus:ring-offset-gym-secondary transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full bg-gradient-to-r from-gym-accent to-gym-accent/90 text-black font-semibold py-2.5 sm:py-3 px-4 rounded-lg text-sm sm:text-base hover:from-gym-accent/90 hover:to-gym-accent/80 focus:outline-none focus:ring-2 focus:ring-gym-accent focus:ring-offset-2 focus:ring-offset-gym-secondary transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
                   <span>Entrando...</span>
                 </>
               ) : (
@@ -123,31 +140,31 @@ function LoginForm() {
           </form>
 
           {/* Demo Credentials */}
-          <div className="mt-8 pt-6 border-t border-gym-border">
+          <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gym-border">
             <p className="text-xs text-gym-text-secondary text-center mb-3">Credenciais de teste:</p>
             <div className="space-y-2 text-xs bg-gym-dark rounded-lg p-3">
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
                 <span className="text-gym-text-secondary">Admin:</span>
-                <span className="text-gym-accent font-mono">carlos.silva@gym.com</span>
+                <span className="text-gym-accent font-mono text-[10px] sm:text-xs break-all">carlos.silva@gym.com</span>
               </div>
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
                 <span className="text-gym-text-secondary">Instrutor:</span>
-                <span className="text-gym-accent font-mono">ana.costa@gym.com</span>
+                <span className="text-gym-accent font-mono text-[10px] sm:text-xs break-all">ana.costa@gym.com</span>
               </div>
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
                 <span className="text-gym-text-secondary">Recepção:</span>
-                <span className="text-gym-accent font-mono">recepcao@gym.com</span>
+                <span className="text-gym-accent font-mono text-[10px] sm:text-xs break-all">recepcao@gym.com</span>
               </div>
-              <div className="pt-2 border-t border-gym-border mt-2">
+              <div className="pt-2 border-t border-gym-border mt-2 flex flex-col sm:flex-row sm:items-center gap-1">
                 <span className="text-gym-text-secondary">Senha padrão:</span>
-                <span className="text-white font-mono ml-2">gym123</span>
+                <span className="text-white font-mono">gym123</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <p className="text-center text-gym-text-secondary text-sm mt-6">
+        <p className="text-center text-gym-text-secondary text-xs sm:text-sm mt-4 sm:mt-6">
           © 2026 Gym System. Todos os direitos reservados.
         </p>
       </div>
