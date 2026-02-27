@@ -142,22 +142,21 @@ function LoginForm() {
           {/* Demo Credentials */}
           <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gym-border">
             <p className="text-xs text-gym-text-secondary text-center mb-3">Credenciais de teste:</p>
-            <div className="space-y-2 text-xs bg-gym-dark rounded-lg p-3">
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
-                <span className="text-gym-text-secondary">Admin:</span>
-                <span className="text-gym-accent font-mono text-[10px] sm:text-xs break-all">carlos.silva@gym.com</span>
+            <div className="space-y-1.5 text-[10px] sm:text-xs bg-gym-dark rounded-lg p-2.5 sm:p-3">
+              <div className="grid grid-cols-[auto,1fr] gap-x-2 gap-y-1 items-baseline">
+                <span className="text-gym-text-secondary whitespace-nowrap">Admin:</span>
+                <span className="text-gym-accent font-mono text-right sm:text-left">carlos.silva@gym.com</span>
+                
+                <span className="text-gym-text-secondary whitespace-nowrap">Instrutor:</span>
+                <span className="text-gym-accent font-mono text-right sm:text-left">ana.costa@gym.com</span>
+                
+                <span className="text-gym-text-secondary whitespace-nowrap">Recepção:</span>
+                <span className="text-gym-accent font-mono text-right sm:text-left">recepcao@gym.com</span>
               </div>
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
-                <span className="text-gym-text-secondary">Instrutor:</span>
-                <span className="text-gym-accent font-mono text-[10px] sm:text-xs break-all">ana.costa@gym.com</span>
-              </div>
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
-                <span className="text-gym-text-secondary">Recepção:</span>
-                <span className="text-gym-accent font-mono text-[10px] sm:text-xs break-all">recepcao@gym.com</span>
-              </div>
-              <div className="pt-2 border-t border-gym-border mt-2 flex flex-col sm:flex-row sm:items-center gap-1">
-                <span className="text-gym-text-secondary">Senha padrão:</span>
-                <span className="text-white font-mono">gym123</span>
+              
+              <div className="pt-1.5 border-t border-gym-border mt-1.5 grid grid-cols-[auto,1fr] gap-x-2 items-baseline">
+                <span className="text-gym-text-secondary whitespace-nowrap">Senha:</span>
+                <span className="text-white font-mono text-right sm:text-left">gym123</span>
               </div>
             </div>
           </div>
