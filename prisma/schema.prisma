@@ -220,3 +220,35 @@ model Schedule {
 
   @@map("schedules")
 }
+
+// Modelo de Equipamentos
+model Equipment {
+  id          String   @id @default(cuid())
+  name        String
+  area        String   // Ex: 'Cardio', 'Musculação Livre'
+  status      String   @default("active") // active, warning, maintenance
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  maintenances Maintenance[]
+
+  @@map("equipments")
+}
+
+// Modelo de Manutenção
+model Maintenance {
+  id          String   @id @default(cuid())
+  equipmentId String
+  equipment   Equipment @relation(fields: [equipmentId], references: [id])
+  
+  description String
+  date        DateTime
+  nextDate    DateTime?
+  status      String   @default("scheduled") // scheduled, completed, cancelled
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("maintenances")
+}

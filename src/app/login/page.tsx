@@ -51,15 +51,15 @@ function LoginForm() {
       </div>
 
       {/* Login Card */}
-      <div className="relative z-10 w-full max-w-md my-auto">
-        <div className="bg-gym-secondary border border-gym-border rounded-2xl shadow-2xl p-6 sm:p-8">
+      <div className="relative z-10 w-full max-w-sm sm:max-w-md my-auto">
+        <div className="bg-gym-secondary border border-gym-border rounded-2xl shadow-2xl p-5 sm:p-8 w-full">
           {/* Logo */}
           <div className="flex flex-col items-center mb-6">
-            <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-gym-accent to-gym-accent/80 rounded-xl flex items-center justify-center mb-3 shadow-lg">
-              <Dumbbell className="w-8 h-8 sm:w-10 sm:h-10 text-black" />
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-gym-accent to-gym-accent/80 rounded-xl flex items-center justify-center mb-3 shadow-lg">
+              <Dumbbell className="w-6 h-6 sm:w-10 sm:h-10 text-black" />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1.5">GYM SYSTEM</h1>
-            <p className="text-gym-text-secondary text-xs sm:text-sm text-center px-4">Sistema de Gestão de Academia</p>
+            <h1 className="text-xl sm:text-3xl font-bold text-white mb-1.5">GYM SYSTEM</h1>
+            <p className="text-gym-text-secondary text-xs sm:text-sm text-center px-2">Sistema de Gestão de Academia</p>
           </div>
 
           {/* Form */}
@@ -115,9 +115,9 @@ function LoginForm() {
                   disabled={loading}
                 >
                   {showPassword ? (
-                    <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" />
-                  ) : (
                     <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
+                  ) : (
+                    <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" />
                   )}
                 </button>
               </div>
@@ -143,19 +143,19 @@ function LoginForm() {
           {/* Demo Credentials */}
           <div className="mt-6 pt-4 border-t border-gym-border">
             <p className="text-[10px] sm:text-xs text-gym-text-secondary text-center mb-2">Credenciais de teste:</p>
-            <div className="space-y-1 text-[9px] sm:text-[10px] bg-gym-dark rounded-lg p-2">
+            <div className="space-y-1 text-[9px] sm:text-[10px] bg-gym-dark rounded-lg p-2 overflow-x-auto">
               <div className="grid grid-cols-[auto,1fr] gap-x-2 items-baseline">
                 <span className="text-gym-text-secondary whitespace-nowrap">Admin:</span>
-                <span className="text-gym-accent font-mono text-right overflow-hidden text-ellipsis">carlos.silva@gym.com</span>
-                
-                <span className="text-gym-text-secondary whitespace-nowrap">Instrutor:</span>
-                <span className="text-gym-accent font-mono text-right overflow-hidden text-ellipsis">ana.costa@gym.com</span>
-                
-                <span className="text-gym-text-secondary whitespace-nowrap">Recepção:</span>
-                <span className="text-gym-accent font-mono text-right overflow-hidden text-ellipsis">recepcao@gym.com</span>
+                <span className="text-gym-accent font-mono text-right w-full block">carlos.silva@gym.com</span>
+
+                <span className="text-gym-text-secondary whitespace-nowrap mt-1">Instrutor:</span>
+                <span className="text-gym-accent font-mono text-right w-full block mt-1">ana.costa@gym.com</span>
+
+                <span className="text-gym-text-secondary whitespace-nowrap mt-1">Recepção:</span>
+                <span className="text-gym-accent font-mono text-right w-full block mt-1">recepcao@gym.com</span>
               </div>
-              
-              <div className="pt-1 border-t border-gym-border mt-1 grid grid-cols-[auto,1fr] gap-x-2 items-baseline">
+
+              <div className="pt-2 border-t border-gym-border mt-2 grid grid-cols-[auto,1fr] gap-x-2 items-baseline">
                 <span className="text-gym-text-secondary whitespace-nowrap">Senha:</span>
                 <span className="text-white font-mono text-right">gym123</span>
               </div>
@@ -176,7 +176,7 @@ export default function LoginPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center bg-gym-dark">
-        <Loader2 className="w-8 h-8 animate-spin text-gym-primary" />
+        <Loader2 className="w-8 h-8 animate-spin text-gym-accent" />
       </div>
     }>
       <LoginForm />

@@ -8,7 +8,9 @@ module.exports = {
       colors: {
         gym: {
           bg: '#0a0a0f',
+          dark: '#0a0a0f',
           surface: '#12121a',
+          secondary: '#12121a',
           card: '#1a1a28',
           border: '#2a2a3d',
           hover: '#222235',
