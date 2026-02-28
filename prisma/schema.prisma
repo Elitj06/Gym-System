@@ -154,8 +154,11 @@ model Employee {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  schedules   Schedule[]
-  user        User?
+  schedules        Schedule[]
+  user             User?
+  attendances      Attendance[]
+  score            EmployeeScore?
+  faceRecognition  FaceRecognition?
 
   @@map("employees")
 }
@@ -251,4 +254,86 @@ model Maintenance {
   updatedAt   DateTime @updatedAt
 
   @@map("maintenances")
+}
+
+// Modelo de Controle de Ponto (Facial Recognition)
+model Attendance {
+  id           String   @id @default(cuid())
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id])
+  
+  checkIn      DateTime @default(now())
+  checkOut     DateTime?
+  
+  // Reconhecimento Facial
+  faceConfidence Float?  // Confiança da detecção (0-100%)
+  faceImageUrl String?   // URL da imagem capturada
+  
+  // Localização
+  location     String?   // Ex: "Recepção", "Área de Musculação"
+  
+  // Status
+  status       String   @default("present") // present, absent, late, left_early
+  isLate       Boolean  @default(false)
+  minutesLate  Int?
+  
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([employeeId, checkIn])
+  @@map("attendances")
+}
+
+// Modelo de Score de Desempenho dos Funcionários
+model EmployeeScore {
+  id          String   @id @default(cuid())
+  employeeId  String   @unique
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  
+  // Scores individuais (0-100)
+  punctualityScore      Float  @default(100) // Baseado em pontualidade
+  customerServiceScore  Float  @default(100) // Baseado em avaliações de clientes
+  hoursScore            Float  @default(100) // Baseado em horas trabalhadas vs esperadas
+  
+  // Score geral (média ponderada)
+  overallScore          Float  @default(100)
+  
+  // Estatísticas
+  totalDaysWorked       Int    @default(0)
+  totalLateArrivals     Int    @default(0)
+  totalEarlyLeaves      Int    @default(0)
+  totalAbsences         Int    @default(0)
+  totalHoursWorked      Float  @default(0)
+  
+  // Período de avaliação
+  evaluationPeriod      String @default("monthly") // daily, weekly, monthly, yearly
+  lastEvaluatedAt       DateTime @default(now())
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("employee_scores")
+}
+
+// Modelo de Dados Faciais (para reconhecimento)
+model FaceRecognition {
+  id          String   @id @default(cuid())
+  employeeId  String   @unique
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  
+  // Embeddings faciais (vector de 128 ou 512 dimensões)
+  faceEmbedding String   // JSON string do vetor
+  
+  // Múltiplas imagens de treino
+  trainingImages String[] // URLs das imagens de treino
+  
+  // Metadata
+  lastTrainedAt DateTime @default(now())
+  isActive      Boolean  @default(true)
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("face_recognitions")
 }
