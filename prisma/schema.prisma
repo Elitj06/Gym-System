@@ -337,3 +337,22 @@ model FaceRecognition {
 
   @@map("face_recognitions")
 }
+
+// Modelo de Câmeras IP/RTSP
+model Camera {
+  id          String   @id @default(cuid())
+  name        String
+  location    String
+  rtspUrl     String
+  username    String?
+  password    String?
+  isActive    Boolean  @default(true)
+  cameraType  String   @default("ip") // ip, rtsp, http
+  resolution  String   @default("1080p")
+  fps         Int      @default(30)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("cameras")
+}
