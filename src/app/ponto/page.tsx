@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { Camera, Clock, CheckCircle2, XCircle, TrendingUp, Calendar } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
@@ -209,13 +209,12 @@ export default function AttendancePage() {
             ) : (
               <div className="space-y-4">
                 <div className="aspect-video bg-gym-darker rounded-lg overflow-hidden relative">
-                  {/* @ts-ignore - dynamic import loses ref types */}
-                  <Webcam
-                    ref={webcamRef}
-                    screenshotFormat="image/jpeg"
-                    className="w-full h-full object-cover"
-                    mirrored
-                  />
+                  {React.createElement(Webcam as any, {
+                    ref: webcamRef,
+                    screenshotFormat: "image/jpeg",
+                    className: "w-full h-full object-cover",
+                    mirrored: true
+                  })}
                   
                   {isProcessing && (
                     <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
