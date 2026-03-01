@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { Camera, Clock, CheckCircle2, XCircle, TrendingUp, Calendar } from 'lucide-react'
-import Webcam from 'react-webcam'
+import dynamic from 'next/dynamic'
+const Webcam = dynamic(() => import('react-webcam'), { ssr: false })
 
 export default function AttendancePage() {
-  const webcamRef = useRef<Webcam>(null)
+  const webcamRef = useRef<any>(null)
   const [isCameraActive, setIsCameraActive] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [result, setResult] = useState<any>(null)
@@ -17,9 +18,9 @@ export default function AttendancePage() {
   })
 
   // Carregar registros recentes ao montar
-  useState(() => {
+  useEffect(() => {
     loadRecentAttendances()
-  })
+  }, [])
 
   const loadRecentAttendances = async () => {
     try {
