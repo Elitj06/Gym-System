@@ -23,8 +23,8 @@ export default async function DashboardPage() {
     where: { paidAt: { gte: startOfLastMonth, lt: startOfThisMonth }, status: 'paid' }
   })
 
-  const receitaMensal = paymentsThisMonth.reduce((acc, curr) => acc + Number(curr.amount), 0)
-  const receitaAnterior = paymentsLastMonth.reduce((acc, curr) => acc + Number(curr.amount), 0)
+  const receitaMensal = paymentsThisMonth.reduce((acc: number, curr: any) => acc + Number(curr.amount), 0)
+  const receitaAnterior = paymentsLastMonth.reduce((acc: number, curr: any) => acc + Number(curr.amount), 0)
   const trendReceita = receitaAnterior === 0 ? 100 : ((receitaMensal - receitaAnterior) / receitaAnterior) * 100
 
   return (

@@ -29,8 +29,8 @@ export async function GET() {
             }
         })
 
-        const receitaMensal = paymentsThisMonth.reduce((acc, curr) => acc + Number(curr.amount), 0)
-        const receitaAnterior = paymentsLastMonth.reduce((acc, curr) => acc + Number(curr.amount), 0)
+        const receitaMensal = paymentsThisMonth.reduce((acc: number, curr: any) => acc + Number(curr.amount), 0)
+        const receitaAnterior = paymentsLastMonth.reduce((acc: number, curr: any) => acc + Number(curr.amount), 0)
         const trendReceita = receitaAnterior === 0 ? 100 : ((receitaMensal - receitaAnterior) / receitaAnterior) * 100
 
         // 3. Distribuição de Planos (Para o Gráfico de Pizza)
@@ -42,13 +42,13 @@ export async function GET() {
 
         // Buscar os nomes reais dos planos
         const planDetails = await prisma.plan.findMany()
-        const planDistribution = plansInfo.map(info => {
-            const p = planDetails.find(pl => pl.id === info.planId)
+        const planDistribution = plansInfo.map((info: any) => {
+            const p = planDetails.find((pl: any) => pl.id === info.planId)
             return {
                 name: p?.name || 'Desconhecido',
                 value: info._count.id
             }
-        }).filter(d => d.value > 0)
+        }).filter((d: any) => d.value > 0)
 
         // Estruturando o JSON para os gráficos e cards
         return NextResponse.json({

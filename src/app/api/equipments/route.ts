@@ -16,7 +16,7 @@ export async function GET() {
         })
 
         // Transformar para o formato esperado pelo frontend
-        const formattedEquipments = equipments.map(eq => {
+        const formattedEquipments = equipments.map((eq: any) => {
             const last = eq.maintenances[0]
             return {
                 id: eq.id,

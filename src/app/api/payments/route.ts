@@ -13,8 +13,8 @@ export async function GET() {
         })
 
         // Obter estatísticas rápidas
-        const totalRevenue = payments.reduce((acc, curr) => acc + Number(curr.amount), 0)
-        const pendingAmount = payments.filter(p => p.status === 'pending').reduce((acc, curr) => acc + Number(curr.amount), 0)
+        const totalRevenue = payments.reduce((acc: number, curr: any) => acc + Number(curr.amount), 0)
+        const pendingAmount = payments.filter((p: any) => p.status === 'pending').reduce((acc: number, curr: any) => acc + Number(curr.amount), 0)
 
         return NextResponse.json({
             payments,
