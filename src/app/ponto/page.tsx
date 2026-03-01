@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Camera, Clock, CheckCircle2, XCircle, TrendingUp, Calendar } from 'lucide-react'
 import dynamic from 'next/dynamic'
-const Webcam = dynamic(() => import('react-webcam'), { ssr: false })
+const Webcam = dynamic(() => import('react-webcam').then(mod => mod.default) as any, { ssr: false })
 
 export default function AttendancePage() {
   const webcamRef = useRef<any>(null)
