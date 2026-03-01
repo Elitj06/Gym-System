@@ -209,6 +209,7 @@ export default function AttendancePage() {
             ) : (
               <div className="space-y-4">
                 <div className="aspect-video bg-gym-darker rounded-lg overflow-hidden relative">
+                  {/* @ts-ignore - dynamic import loses ref types */}
                   <Webcam
                     ref={webcamRef}
                     screenshotFormat="image/jpeg"
