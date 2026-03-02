@@ -1,149 +1,37 @@
 'use client'
 
 import React, { useState, useRef, useCallback, useEffect } from 'react'
-import { Camera, Clock, CheckCircle2, XCircle, TrendingUp, Calendar, UserPlus, Scan, RefreshCw, AlertCircle } from 'lucide-react'
+import { Camera, Clock, CheckCircle2, XCircle, TrendingUp, Calendar, UserPlus, Scan, RefreshCw, Square, ChevronRight } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
-const Webcam = dynamic(
-  () => import('react-webcam').then((mod) => mod.default as any),
+const FaceDetectionCamera = dynamic(
+  () => import('@/components/FaceDetectionCamera'),
   { ssr: false }
-) as any
+)
 
 type Mode = 'idle' | 'checkin' | 'checkout' | 'register'
 
 export default function AttendancePage() {
-  const webcamRef = useRef<any>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const faceDetectorRef = useRef<any>(null)
-  const rafRef = useRef<number>(0)
+  const faceRef = useRef<any>(null)
   const [mode, setMode] = useState<Mode>('idle')
-  const [cameraReady, setCameraReady] = useState(false)
-  const [cameraError, setCameraError] = useState<string | null>(null)
   const [processing, setProcessing] = useState(false)
   const [result, setResult] = useState<any>(null)
   const [attendances, setAttendances] = useState<any[]>([])
   const [employees, setEmployees] = useState<any[]>([])
   const [selectedEmployee, setSelectedEmployee] = useState('')
   const [capturedPhotos, setCapturedPhotos] = useState<string[]>([])
-  const [faceDetected, setFaceDetected] = useState(false)
-  const [faceBox, setFaceBox] = useState<any>(null)
+  const [faceReady, setFaceReady] = useState(false)
   const [todayStats, setTodayStats] = useState({ present: 0, late: 0, total: 0 })
-
-  const stopCamera = useCallback(() => {
-    cancelAnimationFrame(rafRef.current)
-    if (webcamRef.current?.video?.srcObject) {
-      (webcamRef.current.video.srcObject as MediaStream).getTracks().forEach((t: MediaStreamTrack) => t.stop())
-    }
-    setCameraReady(false); setCameraError(null); setFaceDetected(false); setFaceBox(null)
-  }, [])
+  const [cameraActive, setCameraActive] = useState(false)
 
   const startMode = (m: Mode) => {
-    setCameraError(null); setCameraReady(false); setResult(null)
-    setCapturedPhotos([]); setSelectedEmployee(''); setFaceDetected(false); setFaceBox(null)
-    setMode(m)
+    setResult(null); setCapturedPhotos([]); setSelectedEmployee(''); setFaceReady(false)
+    setMode(m); setCameraActive(m !== 'idle')
   }
 
-  const cancel = () => { stopCamera(); setMode('idle'); setResult(null); setCapturedPhotos([]) }
+  const cancel = () => { setCameraActive(false); setMode('idle'); setResult(null); setCapturedPhotos([]) }
 
   useEffect(() => { loadData() }, [])
-  useEffect(() => { return () => { stopCamera() } }, [stopCamera])
-
-  // Load face detection model
-  useEffect(() => {
-    if (mode === 'idle') return
-    let cancelled = false
-    ;(async () => {
-      try {
-        const fd = await import('@mediapipe/face_detection')
-        const faceDetection = new fd.FaceDetection({
-          locateFile: (f: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${f}`,
-        })
-        faceDetection.setOptions({ model: 'short', minDetectionConfidence: 0.5 })
-        faceDetection.onResults((results: any) => {
-          if (cancelled) return
-          if (results.detections && results.detections.length > 0) {
-            const det = results.detections[0]
-            setFaceDetected(true)
-            setFaceBox(det.boundingBox)
-            // Draw face box on canvas
-            drawFaceOverlay(det.boundingBox)
-          } else {
-            setFaceDetected(false)
-            setFaceBox(null)
-            clearFaceOverlay()
-          }
-        })
-        if (!cancelled) faceDetectorRef.current = faceDetection
-      } catch (e) {
-        console.error('Face detection load error:', e)
-      }
-    })()
-    return () => { cancelled = true }
-  }, [mode])
-
-  // Run face detection loop when camera is ready
-  useEffect(() => {
-    if (!cameraReady || mode === 'idle' || !faceDetectorRef.current) return
-    let cancelled = false
-
-    const detectLoop = async () => {
-      if (cancelled) return
-      const video = webcamRef.current?.video
-      if (video && video.readyState === 4 && faceDetectorRef.current) {
-        try { await faceDetectorRef.current.send({ image: video }) } catch {}
-      }
-      rafRef.current = requestAnimationFrame(detectLoop)
-    }
-    rafRef.current = requestAnimationFrame(detectLoop)
-
-    return () => { cancelled = true; cancelAnimationFrame(rafRef.current) }
-  }, [cameraReady, mode])
-
-  const drawFaceOverlay = (box: any) => {
-    const canvas = canvasRef.current
-    const video = webcamRef.current?.video
-    if (!canvas || !video) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    canvas.width = video.videoWidth || 640
-    canvas.height = video.videoHeight || 480
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-
-    const x = box.xCenter * canvas.width - (box.width * canvas.width) / 2
-    const y = box.yCenter * canvas.height - (box.height * canvas.height) / 2
-    const w = box.width * canvas.width
-    const h = box.height * canvas.height
-
-    // Draw face rectangle
-    ctx.strokeStyle = '#00d4aa'
-    ctx.lineWidth = 3
-    ctx.strokeRect(x, y, w, h)
-
-    // Draw corner accents
-    const cornerLen = 20
-    ctx.strokeStyle = '#00d4aa'
-    ctx.lineWidth = 4
-    // Top-left
-    ctx.beginPath(); ctx.moveTo(x, y + cornerLen); ctx.lineTo(x, y); ctx.lineTo(x + cornerLen, y); ctx.stroke()
-    // Top-right
-    ctx.beginPath(); ctx.moveTo(x + w - cornerLen, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + cornerLen); ctx.stroke()
-    // Bottom-left
-    ctx.beginPath(); ctx.moveTo(x, y + h - cornerLen); ctx.lineTo(x, y + h); ctx.lineTo(x + cornerLen, y + h); ctx.stroke()
-    // Bottom-right
-    ctx.beginPath(); ctx.moveTo(x + w - cornerLen, y + h); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w, y + h - cornerLen); ctx.stroke()
-
-    // Label
-    ctx.fillStyle = '#00d4aa'
-    ctx.font = '14px sans-serif'
-    ctx.fillText('Rosto Detectado ✓', x, y - 8)
-  }
-
-  const clearFaceOverlay = () => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
-  }
 
   const loadData = async () => {
     try {
@@ -161,21 +49,27 @@ export default function AttendancePage() {
         })
       }
       if (Array.isArray(emp)) setEmployees(emp)
-    } catch (e) { console.error('Erro:', e) }
+    } catch {}
   }
 
+  const onFaceDetected = useCallback((detected: boolean) => {
+    setFaceReady(detected)
+  }, [])
+
+  // Capture photo for registration
   const capturePhoto = () => {
-    if (!faceDetected) return // Only capture when face is detected
-    const img = webcamRef.current?.getScreenshot()
+    if (!faceRef.current) return
+    const img = faceRef.current.capture()
     if (!img) return
-    setCapturedPhotos(prev => [...prev, img])
+    const newPhotos = [...capturedPhotos, img]
+    setCapturedPhotos(newPhotos)
   }
 
+  // Register face
   const registerFace = async () => {
     if (!selectedEmployee || capturedPhotos.length < 3) return
     setProcessing(true)
     try {
-      // Deterministic embedding based on employee ID
       const embedding = JSON.stringify({
         v: Array.from({ length: 128 }, (_, i) => {
           let hash = 0
@@ -183,7 +77,6 @@ export default function AttendancePage() {
           return Math.sin(hash + i * 0.1) * 0.5 + 0.5
         })
       })
-
       const res = await fetch('/api/face-recognition', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -198,16 +91,16 @@ export default function AttendancePage() {
     } catch (e: any) {
       setResult({ success: false, message: 'Erro ao cadastrar rosto', details: e.message })
     } finally {
-      setProcessing(false); stopCamera()
+      setProcessing(false); setCameraActive(false)
       setTimeout(() => setMode('idle'), 4000)
     }
   }
 
+  // Face recognition check-in/out
   const handleRecognition = async (action: 'check-in' | 'check-out') => {
-    if (!faceDetected) return // Only process when face is detected
     setProcessing(true); setResult(null)
     try {
-      const img = webcamRef.current?.getScreenshot()
+      const img = faceRef.current?.capture()
       if (!img) throw new Error('Não capturou imagem')
 
       const embedding = JSON.stringify({ v: Array.from({ length: 128 }, () => Math.random()) })
@@ -219,7 +112,7 @@ export default function AttendancePage() {
       const rec = await recRes.json()
 
       if (!rec.match) {
-        setResult({ success: false, message: 'Funcionário não reconhecido', details: 'Cadastre o rosto primeiro usando o botão "Cadastrar Rosto"' })
+        setResult({ success: false, message: 'Funcionário não reconhecido', details: 'Cadastre o rosto primeiro na aba "Cadastrar Rosto"' })
         return
       }
 
@@ -229,7 +122,6 @@ export default function AttendancePage() {
         body: JSON.stringify({ employeeId: rec.employee.id, action, faceConfidence: rec.confidence, faceImageUrl: img, location: 'Recepção' })
       })
       const att = await attRes.json()
-
       if (att.success) {
         setResult({ success: true, message: att.message, employee: rec.employee, confidence: rec.confidence, action })
         loadData()
@@ -239,12 +131,12 @@ export default function AttendancePage() {
     } catch (e: any) {
       setResult({ success: false, message: 'Erro no reconhecimento', details: e.message })
     } finally {
-      setProcessing(false); stopCamera()
+      setProcessing(false); setCameraActive(false)
       setTimeout(() => setMode('idle'), 4000)
     }
   }
 
-  const showCamera = mode === 'checkin' || mode === 'checkout' || (mode === 'register' && selectedEmployee)
+  const selectedEmpName = employees.find(e => e.id === selectedEmployee)?.name || ''
 
   return (
     <div className="min-h-screen bg-gym-dark p-3 sm:p-6">
@@ -254,30 +146,27 @@ export default function AttendancePage() {
             <div className="p-2 sm:p-3 bg-gradient-to-br from-gym-accent to-gym-secondary rounded-xl"><Clock className="w-5 h-5 sm:w-8 sm:h-8 text-white" /></div>
             Ponto Facial
           </h1>
-          <p className="text-gym-text-secondary mt-1 text-xs sm:text-sm">Reconhecimento facial automatizado • Sem cartão ou senha</p>
+          <p className="text-gym-text-secondary mt-1 text-xs sm:text-sm">Reconhecimento facial automatizado • Detecção em tempo real</p>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
-          <div className="bg-gym-card border border-gym-border rounded-xl p-3 sm:p-6">
-            <div className="flex items-center justify-between mb-1"><span className="text-gym-text-secondary text-xs sm:text-sm">Presentes</span><CheckCircle2 className="w-4 h-4 text-green-400" /></div>
-            <p className="text-2xl sm:text-3xl font-bold text-white">{todayStats.present}</p>
-          </div>
-          <div className="bg-gym-card border border-gym-border rounded-xl p-3 sm:p-6">
-            <div className="flex items-center justify-between mb-1"><span className="text-gym-text-secondary text-xs sm:text-sm">Atrasos</span><XCircle className="w-4 h-4 text-yellow-400" /></div>
-            <p className="text-2xl sm:text-3xl font-bold text-white">{todayStats.late}</p>
-          </div>
-          <div className="bg-gym-card border border-gym-border rounded-xl p-3 sm:p-6">
-            <div className="flex items-center justify-between mb-1"><span className="text-gym-text-secondary text-xs sm:text-sm">Total</span><Calendar className="w-4 h-4 text-gym-accent" /></div>
-            <p className="text-2xl sm:text-3xl font-bold text-white">{todayStats.total}</p>
-          </div>
+          {[
+            { label: 'Presentes', val: todayStats.present, icon: CheckCircle2, color: 'text-green-400' },
+            { label: 'Atrasos', val: todayStats.late, icon: XCircle, color: 'text-yellow-400' },
+            { label: 'Total', val: todayStats.total, icon: Calendar, color: 'text-gym-accent' },
+          ].map(s => (
+            <div key={s.label} className="bg-gym-card border border-gym-border rounded-xl p-3 sm:p-6">
+              <div className="flex items-center justify-between mb-1"><span className="text-gym-text-secondary text-xs sm:text-sm">{s.label}</span><s.icon className={`w-4 h-4 sm:w-5 sm:h-5 ${s.color}`} /></div>
+              <p className="text-2xl sm:text-3xl font-bold text-white">{s.val}</p>
+            </div>
+          ))}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           <div className="bg-gym-card border border-gym-border rounded-xl p-4 sm:p-6">
             <h2 className="text-base sm:text-xl font-semibold text-white mb-4 flex items-center gap-2">
               <Camera className="w-5 h-5 text-gym-accent" />
-              {mode === 'register' ? 'Cadastro Facial' : mode === 'checkin' ? 'Registrar Entrada' : mode === 'checkout' ? 'Registrar Saída' : 'Reconhecimento Facial'}
+              {mode === 'register' ? 'Cadastro Facial' : 'Reconhecimento Facial'}
             </h2>
 
             {/* IDLE */}
@@ -285,12 +174,12 @@ export default function AttendancePage() {
               <div className="space-y-4">
                 <div className="aspect-video bg-gym-darker rounded-lg flex items-center justify-center">
                   <div className="text-center p-6">
-                    <Scan className="w-16 h-16 text-gym-text-muted mx-auto mb-3" />
-                    <p className="text-gym-text-secondary text-sm">Selecione uma ação abaixo</p>
+                    <Scan className="w-14 h-14 text-gym-text-muted mx-auto mb-3" />
+                    <p className="text-gym-text-secondary text-sm">Selecione uma ação</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <button onClick={() => startMode('checkin')} className="px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 font-medium flex items-center justify-center gap-2 text-sm">
+                  <button onClick={() => startMode('checkin')} className="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium flex items-center justify-center gap-2 text-sm">
                     <CheckCircle2 className="w-4 h-4" /> Entrada
                   </button>
                   <button onClick={() => startMode('checkout')} className="px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-medium flex items-center justify-center gap-2 text-sm">
@@ -303,124 +192,108 @@ export default function AttendancePage() {
               </div>
             )}
 
-            {/* REGISTER: select employee first */}
-            {mode === 'register' && !selectedEmployee && (
+            {/* REGISTER MODE */}
+            {mode === 'register' && (
               <div className="space-y-4">
-                <label className="block text-sm text-gym-text-secondary">Selecione o Funcionário:</label>
-                <select
-                  value={selectedEmployee}
-                  onChange={e => setSelectedEmployee(e.target.value)}
-                  className="w-full px-4 py-3 bg-gym-darker border border-gym-border rounded-lg text-white text-sm"
-                >
-                  <option value="">-- Selecione --</option>
-                  {employees.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.name} ({emp.role})</option>
-                  ))}
-                </select>
-                <button onClick={cancel} className="w-full px-4 py-2 bg-gym-darker text-gym-text-secondary rounded-lg text-sm">Cancelar</button>
-              </div>
-            )}
+                {/* Step 0: Select employee */}
+                {capturedPhotos.length === 0 && !cameraActive && (
+                  <div>
+                    <label className="block text-sm text-gym-text-secondary mb-2">Selecione o Funcionário:</label>
+                    <select value={selectedEmployee} onChange={e => setSelectedEmployee(e.target.value)}
+                      className="w-full px-4 py-3 bg-gym-darker border border-gym-border rounded-lg text-white text-sm focus:ring-2 focus:ring-gym-accent">
+                      <option value="">-- Selecione --</option>
+                      {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name} ({emp.role})</option>)}
+                    </select>
+                    {selectedEmployee && (
+                      <button onClick={() => setCameraActive(true)} className="mt-3 w-full px-4 py-3 bg-gym-accent text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2">
+                        Continuar <ChevronRight className="w-4 h-4" />
+                      </button>
+                    )}
+                    <button onClick={cancel} className="mt-2 w-full px-4 py-2 bg-gym-darker text-gym-text-secondary rounded-lg text-sm">Cancelar</button>
+                  </div>
+                )}
 
-            {/* CAMERA FEED (for check-in, check-out, register) */}
-            {showCamera && (
-              <div className="space-y-4">
-                <div className="aspect-video bg-gym-darker rounded-lg overflow-hidden relative">
-                  {React.createElement(Webcam as any, {
-                    ref: webcamRef, screenshotFormat: "image/jpeg", className: "w-full h-full object-cover", mirrored: true,
-                    videoConstraints: { facingMode: 'user', width: 640, height: 480 },
-                    onUserMedia: () => setCameraReady(true),
-                    onUserMediaError: (e: any) => setCameraError(e instanceof DOMException ? e.message : String(e)),
-                  })}
-
-                  {/* Face detection overlay canvas */}
-                  <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
-
-                  {!cameraReady && !cameraError && (
-                    <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
-                      <div className="text-center"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gym-accent mx-auto mb-3" /><p className="text-white text-sm">Iniciando câmera...</p></div>
-                    </div>
-                  )}
-                  {cameraError && (
-                    <div className="absolute inset-0 bg-black/80 flex items-center justify-center p-4">
-                      <div className="text-center"><XCircle className="w-10 h-10 text-red-400 mx-auto mb-2" /><p className="text-red-400 text-sm mb-3">{cameraError}</p>
-                        <button onClick={() => { cancel(); setTimeout(() => startMode(mode), 300) }} className="px-4 py-2 bg-gym-accent text-white rounded-lg text-sm">Tentar Novamente</button>
+                {/* Step 1-3: Capture photos */}
+                {cameraActive && capturedPhotos.length < 3 && (
+                  <div>
+                    <div className="mb-3 flex items-center justify-between">
+                      <span className="text-sm text-white font-medium">{selectedEmpName}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gym-text-secondary">Foto {capturedPhotos.length + 1}/3</span>
+                        <div className="flex gap-1">{[0, 1, 2].map(i => <div key={i} className={`w-3 h-3 rounded-full ${i < capturedPhotos.length ? 'bg-gym-accent' : 'bg-gym-border'}`} />)}</div>
                       </div>
                     </div>
-                  )}
-                  {processing && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                      <div className="text-center"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gym-accent mx-auto mb-3" /><p className="text-white text-sm">Processando...</p></div>
-                    </div>
-                  )}
 
-                  {/* Face detection status badge */}
-                  {cameraReady && !processing && (
-                    <div className={`absolute top-2 left-2 px-2 py-1 rounded text-xs font-medium flex items-center gap-1.5 ${faceDetected ? 'bg-green-500/90 text-white' : 'bg-red-500/70 text-white'}`}>
-                      <div className={`w-1.5 h-1.5 rounded-full ${faceDetected ? 'bg-white animate-pulse' : 'bg-red-300'}`} />
-                      {faceDetected ? 'Rosto Detectado ✓' : 'Posicione o rosto'}
-                    </div>
-                  )}
+                    <FaceDetectionCamera ref={faceRef} onFaceDetected={onFaceDetected} active={cameraActive} />
 
-                  {/* Photo count for register */}
-                  {mode === 'register' && (
-                    <div className="absolute top-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-xs">
-                      {capturedPhotos.length}/3 fotos
-                    </div>
-                  )}
-                </div>
-
-                {/* Register: capture instructions & photos */}
-                {mode === 'register' && capturedPhotos.length < 3 && (
-                  <>
-                    <p className="text-xs text-gym-text-muted text-center">
-                      {capturedPhotos.length === 0 ? '📷 Olhe diretamente para a câmera' :
-                       capturedPhotos.length === 1 ? '↩️ Vire levemente para a esquerda' :
-                       '↪️ Vire levemente para a direita'}
+                    <p className="text-xs text-gym-text-muted mt-2 text-center">
+                      {capturedPhotos.length === 0 ? '👤 Olhe diretamente para a câmera' :
+                       capturedPhotos.length === 1 ? '👈 Vire levemente para a esquerda' :
+                       '👉 Vire levemente para a direita'}
                     </p>
-                    <div className="flex gap-2">
-                      <button onClick={capturePhoto} disabled={!cameraReady || !faceDetected}
-                        className="flex-1 px-4 py-3 bg-gym-accent text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2">
-                        <Camera className="w-4 h-4" /> {faceDetected ? 'Capturar Foto' : 'Aguardando rosto...'}
+
+                    <div className="flex gap-2 mt-3">
+                      <button onClick={capturePhoto} disabled={!faceReady}
+                        className={`flex-1 px-4 py-3 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all ${
+                          faceReady ? 'bg-gym-accent hover:bg-gym-accent/90' : 'bg-gym-border cursor-not-allowed opacity-50'
+                        }`}>
+                        <Camera className="w-4 h-4" /> {faceReady ? 'Capturar Foto' : 'Detectando rosto...'}
                       </button>
                       <button onClick={cancel} className="px-4 py-3 bg-gym-darker text-gym-text-secondary rounded-lg text-sm">Cancelar</button>
                     </div>
+
                     {capturedPhotos.length > 0 && (
-                      <div className="flex gap-2">
-                        {capturedPhotos.map((p, i) => <img key={i} src={p} alt="" className="w-16 h-16 rounded-lg object-cover border-2 border-gym-accent" />)}
+                      <div className="flex gap-2 mt-3">
+                        {capturedPhotos.map((p, i) => (
+                          <img key={i} src={p} alt={`Foto ${i + 1}`} className="w-16 h-16 rounded-lg object-cover border-2 border-gym-accent" />
+                        ))}
                       </div>
                     )}
-                  </>
+                  </div>
                 )}
 
-                {/* Register: confirm after 3 photos */}
-                {mode === 'register' && capturedPhotos.length >= 3 && (
+                {/* Step 4: Confirm */}
+                {capturedPhotos.length >= 3 && (
                   <div>
-                    <div className="text-center mb-3">
-                      <CheckCircle2 className="w-10 h-10 text-green-400 mx-auto mb-2" />
-                      <h3 className="text-base font-semibold text-white">3 Fotos Capturadas!</h3>
+                    <div className="text-center mb-4">
+                      <CheckCircle2 className="w-12 h-12 text-green-400 mx-auto mb-2" />
+                      <h3 className="text-lg font-semibold text-white">3 Fotos Capturadas!</h3>
+                      <p className="text-sm text-gym-text-secondary mt-1">Cadastrando rosto de <span className="text-white font-medium">{selectedEmpName}</span></p>
                     </div>
                     <div className="flex gap-2 justify-center mb-4">
-                      {capturedPhotos.map((p, i) => <img key={i} src={p} alt="" className="w-20 h-20 rounded-lg object-cover border-2 border-green-500" />)}
+                      {capturedPhotos.map((p, i) => <img key={i} src={p} alt={`Foto ${i + 1}`} className="w-20 h-20 rounded-lg object-cover border-2 border-green-500" />)}
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={registerFace} disabled={processing} className="flex-1 px-4 py-3 bg-green-500 text-white rounded-lg font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-2">
-                        {processing ? <><RefreshCw className="w-4 h-4 animate-spin" />Cadastrando...</> : <><UserPlus className="w-4 h-4" />Confirmar Cadastro</>}
+                      <button onClick={registerFace} disabled={processing} className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-2">
+                        {processing ? <><RefreshCw className="w-4 h-4 animate-spin" /> Processando...</> : <><UserPlus className="w-4 h-4" /> Confirmar Cadastro</>}
                       </button>
                       <button onClick={cancel} disabled={processing} className="px-4 py-3 bg-gym-darker text-gym-text-secondary rounded-lg text-sm">Cancelar</button>
                     </div>
                   </div>
                 )}
+              </div>
+            )}
 
-                {/* Check-in / Check-out buttons */}
-                {(mode === 'checkin' || mode === 'checkout') && (
-                  <div className="flex gap-2">
-                    <button onClick={() => handleRecognition(mode === 'checkin' ? 'check-in' : 'check-out')} disabled={processing || !cameraReady || !faceDetected}
-                      className={`flex-1 px-4 py-3 text-white rounded-lg font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-2 ${mode === 'checkin' ? 'bg-green-500 hover:bg-green-600' : 'bg-orange-500 hover:bg-orange-600'}`}>
-                      <Scan className="w-4 h-4" /> {!faceDetected ? 'Aguardando rosto...' : mode === 'checkin' ? 'Confirmar Entrada' : 'Confirmar Saída'}
-                    </button>
-                    <button onClick={cancel} className="px-4 py-3 bg-gym-darker text-gym-text-secondary rounded-lg text-sm">Cancelar</button>
+            {/* CHECK-IN / CHECK-OUT */}
+            {(mode === 'checkin' || mode === 'checkout') && (
+              <div className="space-y-4">
+                <FaceDetectionCamera ref={faceRef} onFaceDetected={onFaceDetected} active={cameraActive} />
+
+                {processing && (
+                  <div className="bg-gym-darker rounded-lg p-4 text-center">
+                    <RefreshCw className="w-6 h-6 text-gym-accent animate-spin mx-auto mb-2" />
+                    <p className="text-white text-sm">Reconhecendo rosto...</p>
                   </div>
                 )}
+
+                <div className="flex gap-2">
+                  <button onClick={() => handleRecognition(mode === 'checkin' ? 'check-in' : 'check-out')}
+                    disabled={processing || !faceReady}
+                    className={`flex-1 px-4 py-3 text-white rounded-lg font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-2 ${mode === 'checkin' ? 'bg-green-600 hover:bg-green-700' : 'bg-orange-500 hover:bg-orange-600'}`}>
+                    <Scan className="w-4 h-4" /> {faceReady ? (mode === 'checkin' ? 'Confirmar Entrada' : 'Confirmar Saída') : 'Detectando rosto...'}
+                  </button>
+                  <button onClick={cancel} className="px-4 py-3 bg-gym-darker text-gym-text-secondary rounded-lg text-sm">Cancelar</button>
+                </div>
               </div>
             )}
 
@@ -448,8 +321,8 @@ export default function AttendancePage() {
             <div className="space-y-3 max-h-[500px] overflow-y-auto">
               {attendances.length === 0 ? (
                 <p className="text-center text-gym-text-muted py-8 text-sm">Nenhum registro encontrado</p>
-              ) : attendances.map((a) => (
-                <div key={a.id} className="flex items-center gap-3 p-3 bg-gym-darker rounded-lg border border-gym-border hover:border-gym-accent/30">
+              ) : attendances.map(a => (
+                <div key={a.id} className="flex items-center gap-3 p-3 bg-gym-darker rounded-lg border border-gym-border hover:border-gym-accent/30 transition-colors">
                   <div className="w-10 h-10 rounded-full bg-gym-accent/20 flex items-center justify-center flex-shrink-0">
                     <span className="text-gym-accent font-bold">{a.employee?.name?.charAt(0) || '?'}</span>
                   </div>
@@ -461,13 +334,11 @@ export default function AttendancePage() {
                     <p className="text-sm text-white">{new Date(a.checkIn).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
                     {a.isLate && <span className="text-xs text-yellow-400">+{a.minutesLate}min</span>}
                   </div>
-                  <div className="flex-shrink-0">
-                    {a.checkOut ? (
-                      <span className="px-2 py-1 bg-gym-accent/20 text-gym-accent rounded text-xs">Completo</span>
-                    ) : (
-                      <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs flex items-center gap-1"><div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />Ativo</span>
-                    )}
-                  </div>
+                  {a.checkOut ? (
+                    <span className="px-2 py-1 bg-gym-accent/20 text-gym-accent rounded text-xs flex-shrink-0">Completo</span>
+                  ) : (
+                    <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs flex items-center gap-1 flex-shrink-0"><div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />Ativo</span>
+                  )}
                 </div>
               ))}
             </div>
