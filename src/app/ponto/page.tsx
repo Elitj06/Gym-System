@@ -1,9 +1,13 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { Camera, Clock, CheckCircle2, XCircle, TrendingUp, Calendar } from 'lucide-react'
 import dynamic from 'next/dynamic'
-const Webcam = dynamic(() => import('react-webcam').then(mod => mod.default) as any, { ssr: false })
+
+const Webcam = dynamic(
+  () => import('react-webcam').then((mod) => mod.default as any),
+  { ssr: false }
+) as any
 
 export default function AttendancePage() {
   const webcamRef = useRef<any>(null)
@@ -255,15 +259,15 @@ export default function AttendancePage() {
             ) : (
               <div className="space-y-4">
                 <div className="aspect-video bg-gym-darker rounded-lg overflow-hidden relative">
-                  <Webcam
-                    ref={webcamRef}
-                    screenshotFormat="image/jpeg"
-                    className="w-full h-full object-cover"
-                    mirrored
-                    videoConstraints={{ facingMode: 'user', width: 640, height: 480 }}
-                    onUserMedia={handleCameraReady}
-                    onUserMediaError={handleCameraError}
-                  />
+                  {React.createElement(Webcam as any, {
+                    ref: webcamRef,
+                    screenshotFormat: "image/jpeg",
+                    className: "w-full h-full object-cover",
+                    mirrored: true,
+                    videoConstraints: { facingMode: 'user', width: 640, height: 480 },
+                    onUserMedia: handleCameraReady,
+                    onUserMediaError: handleCameraError
+                  })}
 
                   {!cameraReady && !cameraError && (
                     <div className="absolute inset-0 bg-black/80 flex items-center justify-center">

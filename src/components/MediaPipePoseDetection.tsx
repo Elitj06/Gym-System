@@ -1,15 +1,11 @@
 'use client'
 
 import { useRef, useEffect, useState, useCallback } from 'react'
-import Webcam from 'react-webcam'
-import { Pose, POSE_CONNECTIONS } from '@mediapipe/pose'
-import { Camera } from '@mediapipe/camera_utils'
-import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils'
 
 interface PoseDetectionProps {
   onResults?: (results: any) => void
-  videoUrl?: string // Para análise de vídeo pré-gravado
-  isLive?: boolean  // Para câmera ao vivo
+  videoUrl?: string
+  isLive?: boolean
 }
 
 export default function MediaPipePoseDetection({ 
@@ -17,145 +13,221 @@ export default function MediaPipePoseDetection({
   videoUrl, 
   isLive = false 
 }: PoseDetectionProps) {
-  const webcamRef = useRef<Webcam>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const webcamVideoRef = useRef<HTMLVideoElement | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [poseData, setPoseData] = useState<any>(null)
-  const poseRef = useRef<Pose | null>(null)
+  const poseRef = useRef<any>(null)
+  const cameraRef = useRef<any>(null)
+  const animFrameRef = useRef<number>(0)
 
-  // Função para desenhar os resultados
+  // Draw results on canvas
   const onPoseResults = useCallback((results: any) => {
     if (!canvasRef.current) return
 
-    const canvasElement = canvasRef.current
-    const canvasCtx = canvasElement.getContext('2d')
-    if (!canvasCtx) return
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
 
-    canvasCtx.save()
-    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height)
+    ctx.save()
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height)
 
-    // Desenhar a imagem de fundo
-    canvasCtx.drawImage(
-      results.image,
-      0,
-      0,
-      canvasElement.width,
-      canvasElement.height
-    )
-
-    // Desenhar os landmarks e conexões se detectados
     if (results.poseLandmarks) {
-      // Conexões (linhas entre pontos)
-      drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, {
-        color: '#00d4aa',
-        lineWidth: 4,
-      })
+      // Dynamic import already loaded these
+      const { drawConnectors, drawLandmarks } = (window as any).__drawingUtils || {}
+      const { POSE_CONNECTIONS } = (window as any).__poseConnections || {}
 
-      // Landmarks (pontos)
-      drawLandmarks(canvasCtx, results.poseLandmarks, {
-        color: '#ff0364',
-        lineWidth: 2,
-        radius: 6,
-      })
+      if (drawConnectors && POSE_CONNECTIONS) {
+        drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, {
+          color: '#00d4aa',
+          lineWidth: 4,
+        })
+      }
+
+      if (drawLandmarks) {
+        drawLandmarks(ctx, results.poseLandmarks, {
+          color: '#ff0364',
+          lineWidth: 2,
+          radius: 6,
+        })
+      }
 
       setPoseData(results.poseLandmarks)
-      
-      // Callback para análise externa
-      if (onResults) {
-        onResults(results)
-      }
+      onResults?.(results)
     }
 
-    canvasCtx.restore()
+    ctx.restore()
   }, [onResults])
 
-  // Inicializar MediaPipe Pose
+  // Initialize MediaPipe (dynamically)
   useEffect(() => {
-    const pose = new Pose({
-      locateFile: (file) => {
-        return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
-      },
-    })
+    let cancelled = false
 
-    pose.setOptions({
-      modelComplexity: 1,
-      smoothLandmarks: true,
-      enableSegmentation: false,
-      smoothSegmentation: false,
-      minDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.5,
-    })
+    const initPose = async () => {
+      try {
+        const [poseModule, drawingModule] = await Promise.all([
+          import('@mediapipe/pose'),
+          import('@mediapipe/drawing_utils'),
+        ])
 
-    pose.onResults(onPoseResults)
-    poseRef.current = pose
+        if (cancelled) return
 
-    setIsLoading(false)
+        // Store drawing utils globally for the callback
+        ;(window as any).__drawingUtils = drawingModule
+        ;(window as any).__poseConnections = { POSE_CONNECTIONS: poseModule.POSE_CONNECTIONS }
 
-    return () => {
-      if (poseRef.current) {
-        poseRef.current.close()
+        const pose = new poseModule.Pose({
+          locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
+        })
+
+        pose.setOptions({
+          modelComplexity: 1,
+          smoothLandmarks: true,
+          enableSegmentation: false,
+          smoothSegmentation: false,
+          minDetectionConfidence: 0.5,
+          minTrackingConfidence: 0.5,
+        })
+
+        pose.onResults(onPoseResults)
+        poseRef.current = pose
+        setIsLoading(false)
+      } catch (err) {
+        console.error('Erro ao carregar MediaPipe:', err)
+        if (!cancelled) setError('Erro ao carregar modelo de IA.')
       }
     }
+
+    initPose()
+    return () => { cancelled = true }
   }, [onPoseResults])
 
-  // Processar webcam ao vivo
+  // Handle LIVE camera
   useEffect(() => {
-    if (!isLive || !webcamRef.current || !poseRef.current || isLoading) return
+    if (!isLive || isLoading || !poseRef.current) return
 
-    const videoElement = webcamRef.current.video
-    if (!videoElement) return
+    let cancelled = false
 
-    const camera = new Camera(videoElement, {
-      onFrame: async () => {
-        if (poseRef.current && videoElement.readyState === 4) {
-          await poseRef.current.send({ image: videoElement })
+    const startCamera = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 1280, height: 720, facingMode: 'user' },
+          audio: false,
+        })
+
+        if (cancelled) {
+          stream.getTracks().forEach(t => t.stop())
+          return
         }
-      },
-      width: 1280,
-      height: 720,
-    })
 
-    camera.start().catch((err) => {
-      console.error('Erro ao iniciar câmera:', err)
-      setError('Erro ao acessar câmera. Verifique as permissões.')
-    })
+        // Create hidden video element for webcam
+        const video = document.createElement('video')
+        video.srcObject = stream
+        video.playsInline = true
+        video.muted = true
+        webcamVideoRef.current = video
+
+        await video.play()
+
+        const cameraUtilsModule = await import('@mediapipe/camera_utils')
+        if (cancelled) {
+          stream.getTracks().forEach(t => t.stop())
+          return
+        }
+
+        const cam = new cameraUtilsModule.Camera(video, {
+          onFrame: async () => {
+            if (poseRef.current && video.readyState === 4) {
+              await poseRef.current.send({ image: video })
+            }
+          },
+          width: 1280,
+          height: 720,
+        })
+
+        cameraRef.current = cam
+        cam.start()
+      } catch (err: any) {
+        console.error('Erro câmera:', err)
+        if (!cancelled) {
+          if (err.name === 'NotAllowedError') {
+            setError('Permissão de câmera negada. Clique no ícone de câmera na barra do navegador e permita o acesso.')
+          } else if (err.name === 'NotFoundError') {
+            setError('Nenhuma câmera encontrada no dispositivo.')
+          } else {
+            setError(`Erro ao acessar câmera: ${err.message || 'Verifique as permissões.'}`)
+          }
+        }
+      }
+    }
+
+    startCamera()
 
     return () => {
-      camera.stop()
+      cancelled = true
+      if (cameraRef.current) {
+        cameraRef.current.stop()
+        cameraRef.current = null
+      }
+      if (webcamVideoRef.current?.srcObject) {
+        const tracks = (webcamVideoRef.current.srcObject as MediaStream).getTracks()
+        tracks.forEach(t => t.stop())
+        webcamVideoRef.current = null
+      }
     }
   }, [isLive, isLoading])
 
-  // Processar vídeo pré-gravado
+  // Handle VIDEO playback
   useEffect(() => {
-    if (!videoUrl || !videoRef.current || !poseRef.current) return
+    if (!videoUrl || !videoRef.current || isLoading || !poseRef.current) return
 
-    const videoElement = videoRef.current
+    const video = videoRef.current
+    let interval: NodeJS.Timeout | null = null
 
-    const processVideo = async () => {
-      if (poseRef.current && videoElement.readyState >= 2) {
-        await poseRef.current.send({ image: videoElement })
+    const processFrame = async () => {
+      if (poseRef.current && video.readyState >= 2 && !video.paused) {
+        try {
+          await poseRef.current.send({ image: video })
+        } catch (e) { /* ignore frame errors */ }
       }
     }
 
-    videoElement.addEventListener('loadeddata', () => {
+    const onCanPlay = () => {
       setIsLoading(false)
-    })
+      video.play().catch(() => {})
+      interval = setInterval(processFrame, 100)
+    }
 
-    // Processar cada frame do vídeo
-    const interval = setInterval(processVideo, 100) // ~10 FPS para análise
+    video.addEventListener('canplay', onCanPlay)
+    
+    // If already loaded
+    if (video.readyState >= 2) {
+      onCanPlay()
+    }
 
     return () => {
-      clearInterval(interval)
+      video.removeEventListener('canplay', onCanPlay)
+      if (interval) clearInterval(interval)
+      video.pause()
     }
-  }, [videoUrl])
+  }, [videoUrl, isLoading])
 
   if (error) {
     return (
       <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-4 text-red-200">
         <p className="font-semibold">Erro</p>
         <p className="text-sm mt-1">{error}</p>
+        {isLive && (
+          <button
+            onClick={() => { setError(null); setIsLoading(true); }}
+            className="mt-3 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg text-sm transition-colors"
+          >
+            Tentar novamente
+          </button>
+        )}
       </div>
     )
   }
@@ -171,21 +243,7 @@ export default function MediaPipePoseDetection({
         </div>
       )}
 
-      {/* Webcam ao vivo */}
-      {isLive && (
-        <Webcam
-          ref={webcamRef}
-          className="hidden"
-          screenshotFormat="image/jpeg"
-          videoConstraints={{
-            width: 1280,
-            height: 720,
-            facingMode: 'user',
-          }}
-        />
-      )}
-
-      {/* Vídeo pré-gravado */}
+      {/* Hidden video for pre-recorded content */}
       {videoUrl && (
         <video
           ref={videoRef}
@@ -195,10 +253,11 @@ export default function MediaPipePoseDetection({
           loop
           muted
           playsInline
+          crossOrigin="anonymous"
         />
       )}
 
-      {/* Canvas para desenhar detecções */}
+      {/* Canvas for pose overlay */}
       <canvas
         ref={canvasRef}
         className="w-full h-full rounded-lg"
@@ -206,7 +265,7 @@ export default function MediaPipePoseDetection({
         height={720}
       />
 
-      {/* Indicador de pose detectada */}
+      {/* Pose detected indicator */}
       {poseData && (
         <div className="absolute top-4 left-4 bg-green-500/90 text-white px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2">
           <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
