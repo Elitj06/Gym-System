@@ -8,6 +8,8 @@ const Webcam = dynamic(() => import('react-webcam').then(mod => mod.default) as 
 export default function AttendancePage() {
   const webcamRef = useRef<any>(null)
   const [isCameraActive, setIsCameraActive] = useState(false)
+  const [cameraReady, setCameraReady] = useState(false)
+  const [cameraError, setCameraError] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [result, setResult] = useState<any>(null)
   const [recentAttendances, setRecentAttendances] = useState<any[]>([])
@@ -16,6 +18,52 @@ export default function AttendancePage() {
     late: 0,
     total: 0
   })
+
+  // Parar o stream da câmera ao desativar
+  const stopCamera = useCallback(() => {
+    if (webcamRef.current?.video?.srcObject) {
+      const tracks = (webcamRef.current.video.srcObject as MediaStream).getTracks()
+      tracks.forEach((track: MediaStreamTrack) => track.stop())
+    }
+    setCameraReady(false)
+    setCameraError(null)
+  }, [])
+
+  const activateCamera = useCallback(() => {
+    setCameraError(null)
+    setCameraReady(false)
+    setIsCameraActive(true)
+  }, [])
+
+  const deactivateCamera = useCallback(() => {
+    stopCamera()
+    setIsCameraActive(false)
+    setResult(null)
+  }, [stopCamera])
+
+  const handleCameraReady = useCallback(() => {
+    setCameraReady(true)
+    setCameraError(null)
+  }, [])
+
+  const handleCameraError = useCallback((err: string | DOMException) => {
+    const message = err instanceof DOMException ? err.message : String(err)
+    if (message.includes('Timeout') || message.includes('AbortError')) {
+      setCameraError('Câmera demorou para responder. Verifique se outra aba está usando a câmera e tente novamente.')
+    } else if (message.includes('NotAllowed') || message.includes('Permission')) {
+      setCameraError('Permissão de câmera negada. Habilite nas configurações do navegador.')
+    } else if (message.includes('NotFound')) {
+      setCameraError('Nenhuma câmera encontrada neste dispositivo.')
+    } else {
+      setCameraError(`Erro ao acessar câmera: ${message}`)
+    }
+    setCameraReady(false)
+  }, [])
+
+  // Limpar stream ao desmontar
+  useEffect(() => {
+    return () => { stopCamera() }
+  }, [stopCamera])
 
   // Carregar registros recentes ao montar
   useEffect(() => {
@@ -121,7 +169,7 @@ export default function AttendancePage() {
       })
     } finally {
       setIsProcessing(false)
-      setIsCameraActive(false)
+      deactivateCamera()
     }
   }
 
@@ -189,14 +237,14 @@ export default function AttendancePage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <button
-                    onClick={() => setIsCameraActive(true)}
+                    onClick={activateCamera}
                     className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium flex items-center justify-center gap-2"
                   >
                     <CheckCircle2 className="w-5 h-5" />
                     Registrar Entrada
                   </button>
                   <button
-                    onClick={() => setIsCameraActive(true)}
+                    onClick={activateCamera}
                     className="px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium flex items-center justify-center gap-2"
                   >
                     <XCircle className="w-5 h-5" />
@@ -212,8 +260,35 @@ export default function AttendancePage() {
                     screenshotFormat="image/jpeg"
                     className="w-full h-full object-cover"
                     mirrored
+                    videoConstraints={{ facingMode: 'user', width: 640, height: 480 }}
+                    onUserMedia={handleCameraReady}
+                    onUserMediaError={handleCameraError}
                   />
-                  
+
+                  {!cameraReady && !cameraError && (
+                    <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gym-accent mx-auto mb-4"></div>
+                        <p className="text-white font-medium">Iniciando câmera...</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {cameraError && (
+                    <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
+                      <div className="text-center p-6">
+                        <XCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+                        <p className="text-red-400 font-medium mb-3">{cameraError}</p>
+                        <button
+                          onClick={() => { deactivateCamera(); setTimeout(activateCamera, 300) }}
+                          className="px-4 py-2 bg-gym-accent text-white rounded-lg hover:bg-gym-accent/80 transition-colors text-sm"
+                        >
+                          Tentar Novamente
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {isProcessing && (
                     <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                       <div className="text-center">
@@ -227,14 +302,14 @@ export default function AttendancePage() {
                 <div className="grid grid-cols-2 gap-4">
                   <button
                     onClick={() => handleFaceRecognition('check-in')}
-                    disabled={isProcessing}
+                    disabled={isProcessing || !cameraReady}
                     className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Confirmar Entrada
                   </button>
                   <button
                     onClick={() => handleFaceRecognition('check-out')}
-                    disabled={isProcessing}
+                    disabled={isProcessing || !cameraReady}
                     className="px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Confirmar Saída
@@ -242,10 +317,7 @@ export default function AttendancePage() {
                 </div>
 
                 <button
-                  onClick={() => {
-                    setIsCameraActive(false)
-                    setResult(null)
-                  }}
+                  onClick={deactivateCamera}
                   className="w-full px-4 py-2 bg-gym-darker text-gym-text-secondary rounded-lg hover:bg-gym-darker/70 transition-colors text-sm"
                 >
                   Cancelar
