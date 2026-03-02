@@ -19,6 +19,7 @@
   "dependencies": {
     "@mediapipe/camera_utils": "^0.3.1675466862",
     "@mediapipe/drawing_utils": "^0.3.1675466124",
+    "@mediapipe/face_detection": "^0.4.1646425229",
     "@mediapipe/pose": "^0.5.1675469404",
     "@neondatabase/serverless": "^1.0.2",
     "@next-auth/prisma-adapter": "^1.0.7",
