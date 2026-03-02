@@ -1,52 +1,45 @@
-// 🎥 VÍDEOS DE EXEMPLO DE EXERCÍCIOS
-// Usando vídeos públicos com CORS headers compatíveis
+// Vídeos de exemplo - usando URLs públicas com CORS
+// Para produção, hospedar os vídeos no próprio servidor ou CDN
 
 export const EXAMPLE_VIDEOS = {
   squat: {
     id: 'squat-example',
-    name: 'Agachamento Livre (Barbell Squat)',
+    name: 'Agachamento Livre',
     description: 'Exercício composto para pernas e glúteos',
-    url: 'https://cdn.pixabay.com/video/2020/07/30/45349-445038872_large.mp4',
-    thumbnail: '',
+    url: '/videos/squat-demo.mp4',
     duration: '15s',
-    author: 'Demonstração',
+    author: 'GYM System',
     muscles: ['Quadríceps', 'Glúteos', 'Core'],
     difficulty: 'Intermediário'
   },
-  
   benchPress: {
     id: 'bench-press-example',
-    name: 'Supino Reto (Bench Press)',
+    name: 'Supino Reto',
     description: 'Exercício fundamental para peitorais',
-    url: 'https://cdn.pixabay.com/video/2021/01/18/62525-503070825_large.mp4',
-    thumbnail: '',
+    url: '/videos/bench-demo.mp4',
     duration: '12s',
-    author: 'Demonstração',
-    muscles: ['Peitoral', 'Tríceps', 'Deltoides Anterior'],
+    author: 'GYM System',
+    muscles: ['Peitoral', 'Tríceps', 'Deltóides'],
     difficulty: 'Intermediário'
   },
-  
   deadlift: {
     id: 'deadlift-example',
-    name: 'Levantamento Terra (Deadlift)',
+    name: 'Levantamento Terra',
     description: 'Movimento fundamental para força total',
-    url: 'https://cdn.pixabay.com/video/2020/07/30/45349-445038872_large.mp4',
-    thumbnail: '',
+    url: '/videos/deadlift-demo.mp4',
     duration: '18s',
-    author: 'Demonstração',
+    author: 'GYM System',
     muscles: ['Posterior', 'Lombar', 'Trapézio'],
     difficulty: 'Avançado'
   },
-  
   shoulderPress: {
     id: 'shoulder-press-example',
-    name: 'Desenvolvimento de Ombros',
-    description: 'Exercício primário para deltoides',
-    url: 'https://cdn.pixabay.com/video/2021/01/18/62525-503070825_large.mp4',
-    thumbnail: '',
+    name: 'Desenvolvimento Ombros',
+    description: 'Exercício primário para deltóides',
+    url: '/videos/shoulder-demo.mp4',
     duration: '14s',
-    author: 'Demonstração',
-    muscles: ['Deltoides', 'Tríceps', 'Core'],
+    author: 'GYM System',
+    muscles: ['Deltóides', 'Tríceps', 'Core'],
     difficulty: 'Intermediário'
   }
 }
