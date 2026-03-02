@@ -210,13 +210,14 @@ export default function IAVisionPage() {
                     className="group bg-gym-card border border-gym-border rounded-xl overflow-hidden hover:border-gym-accent/50 transition-all cursor-pointer"
                     onClick={() => startAnalysis(video.url)}
                   >
-                    <div className="relative h-48 bg-gym-darker">
-                      <img
-                        src={video.thumbnail}
-                        alt={video.name}
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-all flex items-center justify-center">
+                    <div className="relative h-48 bg-gym-darker flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="w-16 h-16 bg-gym-accent/20 rounded-full flex items-center justify-center mx-auto mb-2">
+                          <Video className="w-8 h-8 text-gym-accent" />
+                        </div>
+                        <p className="text-xs text-gym-text-muted">{video.duration}</p>
+                      </div>
+                      <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-all flex items-center justify-center">
                         <div className="p-4 bg-gym-accent rounded-full group-hover:scale-110 transition-transform">
                           <Play className="w-8 h-8 text-white" fill="white" />
                         </div>
