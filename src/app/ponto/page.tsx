@@ -388,7 +388,7 @@ export default function PontoPage() {
                   </div>
                 </div>
 
-                <FaceDetectionCamera ref={faceRef} onFaceDetected={onFaceDetected} active mirror />
+                <FaceDetectionCamera ref={faceRef} onFaceDetected={onFaceDetected} active />
 
                 <div className="flex items-center gap-2 bg-gym-darker rounded-xl px-3 py-2 border border-gym-border">
                   <span className="text-lg">{PHOTO_STEPS[capturedPhotos.length]?.icon}</span>
@@ -458,7 +458,7 @@ export default function PontoPage() {
             {/* ══ CHECK-IN / CHECK-OUT (employees) ══════════ */}
             {(mode === 'checkin' || mode === 'checkout') && tab === 'employees' && (
               <div className="space-y-3">
-                <FaceDetectionCamera ref={faceRef} onFaceDetected={onFaceDetected} active mirror />
+                <FaceDetectionCamera ref={faceRef} onFaceDetected={onFaceDetected} active />
 
                 {processing && (
                   <div className="bg-gym-darker rounded-xl p-3 flex items-center gap-3 border border-gym-border">
