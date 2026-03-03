@@ -1,22 +1,6 @@
 'use client'
 
-/**
- * FaceDetectionCamera
- * 
- * ARQUITETURA DO CANVAS:
- * - <video> tem CSS transform: scaleX(-1) para efeito espelho (natural para selfie)
- * - <canvas> NÃO tem transform CSS algum — fica em coordenadas absolutas
- * - MediaPipe recebe o frame SEM espelho → suas coords são no espaço original
- * - Para desenhar o bounding box na posição certa sobre o vídeo espelhado,
- *   espelhamos as coordenadas X: drawX = canvasWidth - (mpX + mpW) para o lado esquerdo
- * - O texto/label é desenhado normalmente (ctx.save/restore sem scale) porque
- *   o canvas já NÃO está espelhado
- */
-
-import {
-  useRef, useEffect, useState,
-  forwardRef, useImperativeHandle, useCallback
-} from 'react'
+import { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react'
 import { AlertCircle, Loader2 } from 'lucide-react'
 
 export type FaceQuality = 'none' | 'poor' | 'good' | 'excellent'
@@ -30,107 +14,105 @@ export interface FaceDetectionRef {
   capture: () => string | null
 }
 
-// ─── Canvas drawing ───────────────────────────────────────────────────────────
-function drawOverlay(
-  canvas: HTMLCanvasElement,
-  W: number,
-  H: number,
-  // mpBox: raw MediaPipe box in UN-mirrored space (null when no face)
-  mpBox: { xC: number; yC: number; bw: number; bh: number } | null,
-  quality: FaceQuality,
+// ─── Standalone draw function — pure canvas, zero CSS transform ──────────────
+function paint(
+  cv: HTMLCanvasElement,
+  W: number, H: number,
+  box: { xC: number; yC: number; bw: number; bh: number } | null,
+  q: FaceQuality,
 ) {
-  if (canvas.width !== W) canvas.width  = W
-  if (canvas.height !== H) canvas.height = H
-  const ctx = canvas.getContext('2d')!
+  // Always resize canvas to match video frame
+  if (cv.width !== W)  cv.width  = W
+  if (cv.height !== H) cv.height = H
+
+  const ctx = cv.getContext('2d', { alpha: true })
+  if (!ctx) return
   ctx.clearRect(0, 0, W, H)
 
-  // ── Guide oval (center of canvas, always visible) ──────────────────
-  const ovalCX = W * 0.50
-  const ovalCY = H * 0.44
-  const ovalRX = W * 0.28
-  const ovalRY = H * 0.37
+  // Oval guide geometry
+  const ox = W * 0.50
+  const oy = H * 0.44
+  const rx = W * 0.27
+  const ry = H * 0.36
 
-  if (!mpBox || quality === 'none' || quality === 'poor') {
-    // Dark vignette with transparent oval cutout
-    ctx.save()
-    ctx.fillStyle = 'rgba(0,0,0,0.52)'
+  if (!box || q === 'none' || q === 'poor') {
+    // Step 1: dark fill over entire canvas
+    ctx.globalCompositeOperation = 'source-over'
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'
     ctx.fillRect(0, 0, W, H)
+
+    // Step 2: punch transparent hole using destination-out
     ctx.globalCompositeOperation = 'destination-out'
     ctx.beginPath()
-    ctx.ellipse(ovalCX, ovalCY, ovalRX, ovalRY, 0, 0, Math.PI * 2)
+    ctx.ellipse(ox, oy, rx, ry, 0, 0, Math.PI * 2)
+    ctx.fillStyle = 'rgba(0,0,0,1)'
     ctx.fill()
-    ctx.restore()
 
-    // Animated dashed oval border
+    // Step 3: back to normal compositing
+    ctx.globalCompositeOperation = 'source-over'
+
+    // Animated dashed border around oval
+    const t = (Date.now() / 1000)
     ctx.save()
-    const dashOffset = -(Date.now() / 40) % 40
-    ctx.strokeStyle = quality === 'poor'
-      ? 'rgba(239,68,68,0.95)' : 'rgba(255,255,255,0.6)'
-    ctx.lineWidth = 2.5
-    ctx.setLineDash([14, 10])
-    ctx.lineDashOffset = dashOffset
+    ctx.strokeStyle = q === 'poor' ? '#ef4444' : 'rgba(255,255,255,0.75)'
+    ctx.lineWidth   = 2.5
+    ctx.setLineDash([12, 8])
+    ctx.lineDashOffset = -(t * 25) % 40
     ctx.beginPath()
-    ctx.ellipse(ovalCX, ovalCY, ovalRX, ovalRY, 0, 0, Math.PI * 2)
+    ctx.ellipse(ox, oy, rx, ry, 0, 0, Math.PI * 2)
     ctx.stroke()
     ctx.restore()
 
-    // 4 solid tick marks at cardinal points of oval
-    ;[0, 90, 180, 270].forEach(deg => {
-      const rad  = (deg * Math.PI) / 180
-      const px   = ovalCX + ovalRX * Math.cos(rad)
-      const py   = ovalCY + ovalRY * Math.sin(rad)
-      const inX  = ovalCX + (ovalRX - 10) * Math.cos(rad)
-      const inY  = ovalCY + (ovalRY - 10) * Math.sin(rad)
+    // Cardinal tick marks
+    for (const deg of [0, 90, 180, 270]) {
+      const rad = deg * Math.PI / 180
+      const px = ox + rx * Math.cos(rad)
+      const py = oy + ry * Math.sin(rad)
       ctx.beginPath()
-      ctx.moveTo(inX, inY); ctx.lineTo(px, py)
+      ctx.moveTo(ox + (rx - 12) * Math.cos(rad), oy + (ry - 12) * Math.sin(rad))
+      ctx.lineTo(px, py)
       ctx.strokeStyle = 'rgba(255,255,255,0.9)'
       ctx.lineWidth   = 3
       ctx.setLineDash([])
       ctx.stroke()
-    })
+    }
 
-    // Instruction text at bottom
-    const msg = quality === 'poor'
-      ? 'Centralize o rosto no oval'
-      : 'Posicione seu rosto no oval'
-    ctx.font      = '600 13px system-ui, sans-serif'
-    const tw      = ctx.measureText(msg).width
-    const tx      = (W - tw) / 2
-    const ty      = H * 0.88
-    ctx.fillStyle = 'rgba(0,0,0,0.65)'
+    // Instruction text
+    const msg = q === 'poor' ? 'Centralize o rosto no oval' : 'Posicione seu rosto no oval'
+    ctx.font = 'bold 13px system-ui, sans-serif'
+    const tw = ctx.measureText(msg).width
+    const tx = (W - tw) / 2
+    const ty = H * 0.88
+    ctx.fillStyle = 'rgba(0,0,0,0.7)'
     ctx.beginPath()
-    ctx.roundRect(tx - 10, ty - 18, tw + 20, 28, 8)
+    if (ctx.roundRect) ctx.roundRect(tx - 10, ty - 18, tw + 20, 28, 8)
+    else ctx.rect(tx - 10, ty - 18, tw + 20, 28)
     ctx.fill()
-    ctx.fillStyle = 'rgba(255,255,255,0.92)'
+    ctx.fillStyle = '#ffffff'
     ctx.fillText(msg, tx, ty)
     return
   }
 
-  // ── Face detected: compute mirrored box position ────────────────────
-  // MediaPipe coords are in un-mirrored space.
-  // Since video is CSS-mirrored, we mirror X axis:
-  //   mirroredLeft = W - (mpBox.xC*W + mpBox.bw*W/2)
-  const rawLeft   = (mpBox.xC - mpBox.bw / 2) * W
-  const rawTop    = (mpBox.yC - mpBox.bh / 2) * H
-  const rawW      = mpBox.bw * W
-  const rawH      = mpBox.bh * H
-  const mirLeft   = W - rawLeft - rawW
-  const bx        = mirLeft
-  const by        = rawTop
-  const bw        = rawW
-  const bh        = rawH
+  // ── Face detected ──────────────────────────────────────────────────────────
+  // MediaPipe gives coords in UN-mirrored space.
+  // Since video is CSS scaleX(-1), we mirror X to match visual position.
+  const rawL = (box.xC - box.bw / 2) * W
+  const rawT = (box.yC - box.bh / 2) * H
+  const bw   = box.bw * W
+  const bh   = box.bh * H
+  const bx   = W - rawL - bw   // mirrored X
+  const by   = rawT
 
-  const color =
-    quality === 'excellent' ? '#00d4aa' :
-    quality === 'good'      ? '#eab308' : '#ef4444'
+  const color = q === 'excellent' ? '#00d4aa' : q === 'good' ? '#eab308' : '#ef4444'
 
-  // Subtle overlay
-  ctx.fillStyle = 'rgba(0,0,0,0.10)'
+  // Light overlay (no punch-out needed)
+  ctx.globalCompositeOperation = 'source-over'
+  ctx.fillStyle = 'rgba(0,0,0,0.15)'
   ctx.fillRect(0, 0, W, H)
 
-  // Glow effect
+  // Glow
   ctx.shadowColor = color
-  ctx.shadowBlur  = 14
+  ctx.shadowBlur  = 16
   ctx.strokeStyle = color
   ctx.lineWidth   = 2.5
   ctx.setLineDash([])
@@ -138,30 +120,28 @@ function drawOverlay(
   ctx.shadowBlur  = 0
 
   // Corner accents
-  const cl = Math.min(bw, bh) * 0.20
-  ctx.lineWidth   = 4
+  const cl = Math.min(bw, bh) * 0.22
+  ctx.lineWidth   = 4.5
   ctx.strokeStyle = color
   ;[
-    [bx,      by,      bx + cl, by,      bx,      by + cl],
+    [bx,      by,      bx+cl,   by,      bx,      by+cl  ],
     [bx+bw-cl,by,      bx+bw,   by,      bx+bw,   by+cl  ],
     [bx,      by+bh-cl,bx,      by+bh,   bx+cl,   by+bh  ],
     [bx+bw-cl,by+bh,   bx+bw,   by+bh,   bx+bw,   by+bh-cl],
-  ].forEach(([x1,y1, mx,my, x2,y2]) => {
-    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(mx,my); ctx.lineTo(x2,y2)
-    ctx.stroke()
+  ].forEach(([x1,y1,mx,my,x2,y2]) => {
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(mx,my); ctx.lineTo(x2,y2); ctx.stroke()
   })
 
-  // Label (text in canvas coords = already un-mirrored, so just draw normally)
-  const label = quality === 'excellent' ? '✓ Rosto Pronto'
-              : quality === 'good'      ? 'Aproxime-se'
-              : 'Centralize'
+  // Label above box (coords already in canvas/un-mirrored space)
+  const label = q === 'excellent' ? '✓ Rosto Pronto' : q === 'good' ? 'Aproxime-se' : 'Centralize'
   ctx.font      = 'bold 13px system-ui, sans-serif'
   const lw      = ctx.measureText(label).width
   const lx      = Math.max(4, Math.min(bx, W - lw - 16))
   const ly      = Math.max(22, by - 8)
-  ctx.fillStyle = 'rgba(0,0,0,0.72)'
+  ctx.fillStyle = 'rgba(0,0,0,0.75)'
   ctx.beginPath()
-  ctx.roundRect(lx - 6, ly - 17, lw + 12, 24, 6)
+  if (ctx.roundRect) ctx.roundRect(lx - 6, ly - 17, lw + 12, 24, 6)
+  else ctx.rect(lx - 6, ly - 17, lw + 12, 24)
   ctx.fill()
   ctx.fillStyle = color
   ctx.fillText(label, lx, ly)
@@ -169,101 +149,74 @@ function drawOverlay(
 
 // ─── Component ────────────────────────────────────────────────────────────────
 const FaceDetectionCamera = forwardRef<FaceDetectionRef, Props>(({
-  onFaceDetected, active = true
+  onFaceDetected,
+  active = true,
 }, ref) => {
-
   const videoRef    = useRef<HTMLVideoElement>(null)
-  const captureRef  = useRef<HTMLCanvasElement>(null)   // hidden, for photo capture
-  const overlayRef  = useRef<HTMLCanvasElement>(null)   // visible overlay
+  const captureRef  = useRef<HTMLCanvasElement>(null)
+  const overlayRef  = useRef<HTMLCanvasElement>(null)
   const streamRef   = useRef<MediaStream | null>(null)
-  const detectorRef = useRef<any>(null)
-  const rafDetRef   = useRef<number>(0)       // detection rAF
-  const rafDrawRef  = useRef<number>(0)       // draw rAF
+  const detRef      = useRef<any>(null)
+  const rafDetRef   = useRef<number>(0)
+  const rafDrawRef  = useRef<number>(0)
   const aliveRef    = useRef(true)
-  const mpBoxRef    = useRef<{ xC: number; yC: number; bw: number; bh: number } | null>(null)
-  const qualityRef  = useRef<FaceQuality>('none')
+  const boxRef      = useRef<{ xC: number; yC: number; bw: number; bh: number } | null>(null)
+  const qualRef     = useRef<FaceQuality>('none')
 
   const [phase,   setPhase]   = useState<'init' | 'ready' | 'error'>('init')
   const [errMsg,  setErrMsg]  = useState('')
   const [quality, setQuality] = useState<FaceQuality>('none')
 
-  // ── Capture ──────────────────────────────────────────────────────────
+  // ── Expose capture() ────────────────────────────────────────────────
   useImperativeHandle(ref, () => ({
     capture(): string | null {
-      const v = videoRef.current
-      const c = captureRef.current
+      const v = videoRef.current, c = captureRef.current
       if (!v || !c || v.readyState < 2) return null
       c.width  = v.videoWidth  || 640
       c.height = v.videoHeight || 480
       const ctx = c.getContext('2d')!
-      // Capture the raw (un-mirrored) frame for correct storage
-      ctx.drawImage(v, 0, 0, c.width, c.height)
+      ctx.drawImage(v, 0, 0)   // raw un-mirrored photo (correct for storage)
       return c.toDataURL('image/jpeg', 0.92)
     }
   }))
 
-  // ── Continuous 60fps redraw loop ─────────────────────────────────────
-  const startDraw = useCallback(() => {
-    const loop = () => {
-      if (!aliveRef.current) return
-      const canvas = overlayRef.current
-      const video  = videoRef.current
-      if (canvas && video && video.readyState >= 2) {
-        drawOverlay(
-          canvas,
-          video.videoWidth  || 640,
-          video.videoHeight || 480,
-          mpBoxRef.current,
-          qualityRef.current,
-        )
-      }
-      rafDrawRef.current = requestAnimationFrame(loop)
-    }
-    rafDrawRef.current = requestAnimationFrame(loop)
-  }, [])
-
-  // ── Load MediaPipe once ──────────────────────────────────────────────
+  // ── Load MediaPipe detector ──────────────────────────────────────────
   useEffect(() => {
     aliveRef.current = true
-    let gone = false;
-    (async () => {
+    let gone = false
+    ;(async () => {
       try {
-        const fd = await import('@mediapipe/face_detection')
+        const fd  = await import('@mediapipe/face_detection')
         if (gone || !aliveRef.current) return
-
         const det = new fd.FaceDetection({
           locateFile: (f: string) =>
             `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4.1646425229/${f}`
         })
-        det.setOptions({ model: 'short', minDetectionConfidence: 0.5 })
+        det.setOptions({ model: 'short', minDetectionConfidence: 0.45 })
         det.onResults((res: any) => {
           if (!aliveRef.current) return
-
           if (res.detections?.length > 0) {
             const b = res.detections[0].boundingBox
             if (b) {
-              // MediaPipe normalized: xCenter, yCenter, width, height
               const area = b.width * b.height
               const dx   = Math.abs(b.xCenter - 0.5)
               const dy   = Math.abs(b.yCenter - 0.44)
-
               const q: FaceQuality =
-                area > 0.09 && dx < 0.15 && dy < 0.15 ? 'excellent' :
-                area > 0.04 && dx < 0.25 && dy < 0.25 ? 'good'      : 'poor'
-
-              mpBoxRef.current  = { xC: b.xCenter, yC: b.yCenter, bw: b.width, bh: b.height }
-              qualityRef.current = q
+                area > 0.09 && dx < 0.16 && dy < 0.16 ? 'excellent' :
+                area > 0.04 && dx < 0.26 && dy < 0.26 ? 'good'      : 'poor'
+              boxRef.current  = { xC: b.xCenter, yC: b.yCenter, bw: b.width, bh: b.height }
+              qualRef.current = q
               setQuality(q)
               onFaceDetected?.(true, q)
             }
           } else {
-            mpBoxRef.current   = null
-            qualityRef.current = 'none'
+            boxRef.current  = null
+            qualRef.current = 'none'
             setQuality('none')
             onFaceDetected?.(false, 'none')
           }
         })
-        detectorRef.current = det
+        detRef.current = det
       } catch {
         if (!gone && aliveRef.current) {
           setErrMsg('Não foi possível carregar o detector facial.')
@@ -274,22 +227,22 @@ const FaceDetectionCamera = forwardRef<FaceDetectionRef, Props>(({
     return () => { gone = true }
   }, [])
 
-  // ── Camera lifecycle ─────────────────────────────────────────────────
+  // ── Camera + draw loops ──────────────────────────────────────────────
   useEffect(() => {
     if (!active) {
       cancelAnimationFrame(rafDetRef.current)
       cancelAnimationFrame(rafDrawRef.current)
       streamRef.current?.getTracks().forEach(t => t.stop())
-      streamRef.current     = null
-      mpBoxRef.current      = null
-      qualityRef.current    = 'none'
+      streamRef.current = null
+      boxRef.current    = null
+      qualRef.current   = 'none'
       setQuality('none')
       setPhase('init')
       return
     }
 
-    let gone = false;
-    (async () => {
+    let gone = false
+    ;(async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
@@ -298,29 +251,46 @@ const FaceDetectionCamera = forwardRef<FaceDetectionRef, Props>(({
         if (gone) { stream.getTracks().forEach(t => t.stop()); return }
         streamRef.current = stream
 
-        const video       = videoRef.current!
-        video.srcObject   = stream
+        const video     = videoRef.current!
+        video.srcObject = stream
         video.setAttribute('playsinline', 'true')
-        video.muted       = true
+        video.muted     = true
+        await video.play().catch(() => {})
 
+        // Wait for first frame
         await new Promise<void>(res => {
-          video.addEventListener('loadeddata', function onLoad() {
-            video.removeEventListener('loadeddata', onLoad); res()
-          })
-          video.play().catch(() => {})
+          if (video.readyState >= 2) { res(); return }
+          const onData = () => { video.removeEventListener('loadeddata', onData); res() }
+          video.addEventListener('loadeddata', onData)
         })
         if (gone || !aliveRef.current) return
 
-        setPhase('ready')
-        startDraw()         // start 60fps overlay loop
+        // Pre-size overlay canvas immediately so first draw has correct dims
+        const cv = overlayRef.current!
+        cv.width  = video.videoWidth  || 640
+        cv.height = video.videoHeight || 480
 
-        // Detection loop
+        setPhase('ready')
+
+        // 60fps draw loop
+        const drawLoop = () => {
+          if (gone || !aliveRef.current) return
+          const cv  = overlayRef.current
+          const vid = videoRef.current
+          if (cv && vid && vid.readyState >= 2) {
+            paint(cv, vid.videoWidth || 640, vid.videoHeight || 480, boxRef.current, qualRef.current)
+          }
+          rafDrawRef.current = requestAnimationFrame(drawLoop)
+        }
+        rafDrawRef.current = requestAnimationFrame(drawLoop)
+
+        // Detection loop (runs independently)
         let busy = false
         const detLoop = async () => {
           if (gone || !aliveRef.current) return
-          if (!busy && detectorRef.current && video.readyState >= 2) {
+          if (!busy && detRef.current && video.readyState >= 2) {
             busy = true
-            try { await detectorRef.current.send({ image: video }) } catch {}
+            try { await detRef.current.send({ image: video }) } catch {}
             busy = false
           }
           rafDetRef.current = requestAnimationFrame(detLoop)
@@ -344,11 +314,10 @@ const FaceDetectionCamera = forwardRef<FaceDetectionRef, Props>(({
       streamRef.current?.getTracks().forEach(t => t.stop())
       streamRef.current = null
     }
-  }, [active, startDraw])
+  }, [active])
 
   useEffect(() => () => { aliveRef.current = false }, [])
 
-  // ── Error ────────────────────────────────────────────────────────────
   if (phase === 'error') return (
     <div className="w-full aspect-[4/3] bg-gym-darker rounded-2xl flex items-center justify-center border border-red-500/40">
       <div className="text-center px-6">
@@ -360,7 +329,7 @@ const FaceDetectionCamera = forwardRef<FaceDetectionRef, Props>(({
 
   const badgeBg    = quality === 'excellent' ? 'bg-emerald-500'
                    : quality === 'good'      ? 'bg-amber-500'
-                   : quality === 'poor'      ? 'bg-red-500' : 'bg-gray-700'
+                   : quality === 'poor'      ? 'bg-red-500' : 'bg-gray-700/80'
   const badgeLabel = quality === 'excellent' ? '✓ Rosto Pronto'
                    : quality === 'good'      ? 'Aproxime-se'
                    : quality === 'poor'      ? 'Centralize'  : 'Posicione o rosto'
@@ -376,34 +345,31 @@ const FaceDetectionCamera = forwardRef<FaceDetectionRef, Props>(({
         </div>
       )}
 
-      {/*
-        Video: mirrored via CSS only.
-        transform-style doesn't affect the canvas — they are siblings.
-      */}
+      {/* Video — mirrored CSS only, canvas has NO transform */}
       <video
         ref={videoRef}
         className="absolute inset-0 w-full h-full object-cover"
         style={{ transform: 'scaleX(-1)' }}
-        playsInline
-        muted
+        playsInline muted
       />
 
       {/*
-        Overlay canvas: NO CSS transform.
-        Drawing logic mirrors the X coordinates internally to match the flipped video.
-        This ensures the oval and bounding box render correctly without text inversion.
+        Canvas overlay — absolutely NO CSS transform here.
+        The paint() function mirrors box X coords internally.
+        destination-out composite only works correctly on untransformed canvas.
       */}
       <canvas
         ref={overlayRef}
         className="absolute inset-0 w-full h-full pointer-events-none"
+        style={{ transform: 'none', imageRendering: 'pixelated' }}
       />
 
-      {/* Hidden canvas for photo capture */}
+      {/* Hidden capture canvas */}
       <canvas ref={captureRef} className="hidden" />
 
-      {/* Status badge */}
+      {/* Quality badge */}
       {phase === 'ready' && (
-        <div className={`absolute top-3 left-3 z-20 px-3 py-1.5 rounded-full text-xs font-bold text-white shadow-lg transition-colors duration-300 ${badgeBg}`}>
+        <div className={`absolute top-3 left-3 z-20 px-3 py-1.5 rounded-full text-xs font-bold text-white shadow-lg transition-all duration-200 ${badgeBg}`}>
           {badgeLabel}
         </div>
       )}
