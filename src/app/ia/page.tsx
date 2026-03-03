@@ -2,7 +2,12 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { Camera, Upload, TrendingUp, AlertCircle, CheckCircle2, Info, SwitchCamera, Square, FileText, Clock } from 'lucide-react'
-import MediaPipePoseDetection from '@/components/MediaPipePoseDetection'
+import dynamic from 'next/dynamic'
+
+const MediaPipePoseDetection = dynamic(
+  () => import('@/components/MediaPipePoseDetection'),
+  { ssr: false }
+)
 
 function scoreColor(s: number) { return s >= 80 ? '#166534' : s >= 60 ? '#22c55e' : s >= 40 ? '#eab308' : '#ef4444' }
 function scoreLabel(s: number) { return s >= 80 ? 'Excelente' : s >= 60 ? 'Bom' : s >= 40 ? 'Regular' : 'Corrigir' }
