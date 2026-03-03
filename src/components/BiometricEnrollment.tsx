@@ -105,9 +105,21 @@ export default function BiometricEnrollment({
   const [saving,        setSaving]        = useState(false)
   const [errorMsg,      setErrorMsg]      = useState('')
   const [captureFlash,  setCaptureFlash]  = useState(false)
-  const [holdProgress,  setHoldProgress]  = useState(0)  // 0-100 para auto-captura
-  const holdTimerRef   = useRef<NodeJS.Timeout | null>(null)
-  const holdStartRef   = useRef<number>(0)
+  const [holdProgress,  setHoldProgress]  = useState(0)
+
+  // Refs para evitar closures stale no timer
+  const holdTimerRef    = useRef<ReturnType<typeof setInterval> | null>(null)
+  const holdStartRef    = useRef<number>(0)
+  const currentAngleRef = useRef(0)
+  const capturesRef     = useRef<Record<string, string>>({})
+  const qualityRef      = useRef<FaceQuality>('none')
+  const phaseRef        = useRef<Phase>('intro')
+
+  // Manter refs sincronizados com state
+  useEffect(() => { currentAngleRef.current = currentAngle }, [currentAngle])
+  useEffect(() => { capturesRef.current = captures },         [captures])
+  useEffect(() => { qualityRef.current = quality },           [quality])
+  useEffect(() => { phaseRef.current = phase },               [phase])
 
   const canCapture   = quality === 'good' || quality === 'excellent'
   const angle        = ANGLES[currentAngle]
@@ -116,57 +128,87 @@ export default function BiometricEnrollment({
   const allCaptured  = doneAngles.length >= totalAngles
   const cameraActive = phase === 'capture'
 
-  // ── Auto-capture: segura por 1.5s com boa qualidade ─────────────────────
+  // ── Capture photo — usa refs, nunca stale ────────────────────────────────
+  const doCapture = useCallback(() => {
+    const img = faceRef.current?.capture()
+    if (!img) return
+
+    const angleIdx = currentAngleRef.current
+    const angleId  = ANGLES[angleIdx].id
+
+    // Já capturou este ângulo (guard duplo)
+    if (capturesRef.current[angleId]) return
+
+    setCaptureFlash(true)
+    setTimeout(() => setCaptureFlash(false), 250)
+
+    // Atualizar captures
+    const newCaptures = { ...capturesRef.current, [angleId]: img }
+    capturesRef.current = newCaptures
+    setCaptures(newCaptures)
+    setHoldProgress(0)
+
+    // Avançar para próximo ângulo
+    setTimeout(() => {
+      const next = angleIdx + 1
+      if (next < ANGLES.length) {
+        currentAngleRef.current = next
+        setCurrentAngle(next)
+      }
+    }, 700)
+  }, []) // sem dependências — usa só refs
+
+  // ── Auto-capture: hold 1.5s com boa qualidade ───────────────────────────
   useEffect(() => {
-    if (phase !== 'capture' || !canCapture) {
-      setHoldProgress(0)
-      if (holdTimerRef.current) clearInterval(holdTimerRef.current)
-      return
+    // Limpar timer anterior sempre que as deps mudarem
+    if (holdTimerRef.current) {
+      clearInterval(holdTimerRef.current)
+      holdTimerRef.current = null
     }
+    setHoldProgress(0)
 
-    // Já capturou este ângulo
-    if (captures[angle.id]) return
+    if (phase !== 'capture') return
+    if (!canCapture) return
+    if (captures[angle.id]) return  // já capturado
 
-    holdStartRef.current = Date.now()
     const HOLD_MS = 1500
-    const TICK_MS = 50
+    const TICK_MS = 40
+    holdStartRef.current = Date.now()
 
     holdTimerRef.current = setInterval(() => {
+      // Re-verificar condições no tick (usando refs para valores atuais)
+      if (phaseRef.current !== 'capture') {
+        clearInterval(holdTimerRef.current!)
+        holdTimerRef.current = null
+        setHoldProgress(0)
+        return
+      }
+      if (qualityRef.current !== 'good' && qualityRef.current !== 'excellent') {
+        clearInterval(holdTimerRef.current!)
+        holdTimerRef.current = null
+        setHoldProgress(0)
+        return
+      }
+
       const elapsed = Date.now() - holdStartRef.current
       const pct = Math.min(100, (elapsed / HOLD_MS) * 100)
       setHoldProgress(pct)
 
       if (pct >= 100) {
         clearInterval(holdTimerRef.current!)
+        holdTimerRef.current = null
         doCapture()
       }
     }, TICK_MS)
 
     return () => {
-      if (holdTimerRef.current) clearInterval(holdTimerRef.current)
+      if (holdTimerRef.current) {
+        clearInterval(holdTimerRef.current)
+        holdTimerRef.current = null
+      }
       setHoldProgress(0)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, canCapture, currentAngle, angle.id])
-
-  // ── Capture photo ────────────────────────────────────────────────────────
-  const doCapture = useCallback(() => {
-    const img = faceRef.current?.capture()
-    if (!img) return
-
-    setCaptureFlash(true)
-    setTimeout(() => setCaptureFlash(false), 200)
-
-    setCaptures(prev => ({ ...prev, [angle.id]: img }))
-
-    // Avançar para próximo ângulo com delay
-    setTimeout(() => {
-      if (currentAngle + 1 < totalAngles) {
-        setCurrentAngle(i => i + 1)
-        setHoldProgress(0)
-      }
-    }, 600)
-  }, [angle.id, currentAngle, totalAngles])
+  }, [phase, canCapture, currentAngle, angle.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Save enrollment ──────────────────────────────────────────────────────
   const save = async () => {
@@ -228,9 +270,14 @@ export default function BiometricEnrollment({
   }
 
   const reset = () => {
+    if (holdTimerRef.current) { clearInterval(holdTimerRef.current); holdTimerRef.current = null }
+    capturesRef.current = {}
+    currentAngleRef.current = 0
+    qualityRef.current = 'none'
     setCaptures({})
     setCurrentAngle(0)
     setHoldProgress(0)
+    setQuality('none')
     setPhase('capture')
     setErrorMsg('')
   }
@@ -429,32 +476,50 @@ export default function BiometricEnrollment({
           <FaceDetectionCamera
             ref={faceRef}
             active={cameraActive && !captures[angle.id]}
-            onFaceDetected={(_, q) => setQuality(q)}
+            onFaceDetected={(_, q) => { qualityRef.current = q; setQuality(q) }}
           />
 
-          {/* Auto-capture progress ring */}
-          {canCapture && !captures[angle.id] && holdProgress > 0 && (
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10">
-              <div className="relative w-14 h-14">
-                <svg className="w-14 h-14 -rotate-90" viewBox="0 0 56 56">
-                  <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="3" />
+          {/* Auto-capture progress ring — canto inferior direito, fora do rosto */}
+          {canCapture && !captures[angle.id] && (
+            <div className="absolute bottom-3 right-3 z-10">
+              <div className="relative w-16 h-16">
+                {/* Fundo semi-opaco */}
+                <div className="absolute inset-0 rounded-full bg-black/60 backdrop-blur-sm border border-white/20" />
+                <svg className="w-16 h-16 -rotate-90 relative z-10" viewBox="0 0 64 64">
+                  <circle cx="32" cy="32" r="27" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="4" />
                   <circle
-                    cx="28" cy="28" r="24"
+                    cx="32" cy="32" r="27"
                     fill="none"
-                    stroke="#00d4aa"
-                    strokeWidth="3"
+                    stroke={holdProgress > 0 ? '#00d4aa' : 'rgba(255,255,255,0.3)'}
+                    strokeWidth="4"
                     strokeLinecap="round"
-                    strokeDasharray={`${2 * Math.PI * 24}`}
-                    strokeDashoffset={`${2 * Math.PI * 24 * (1 - holdProgress / 100)}`}
-                    className="transition-all duration-75"
+                    strokeDasharray={`${2 * Math.PI * 27}`}
+                    strokeDashoffset={`${2 * Math.PI * 27 * (1 - holdProgress / 100)}`}
+                    style={{ transition: 'stroke-dashoffset 0.04s linear' }}
                   />
                 </svg>
-                <div className="absolute inset-0 flex items-center justify-center text-lg">
-                  {angle.icon}
+                <div className="absolute inset-0 flex flex-col items-center justify-center z-20">
+                  <span className="text-lg leading-none">{angle.icon}</span>
+                  {holdProgress > 0 && (
+                    <span className="text-[10px] font-bold text-[#00d4aa] leading-none mt-0.5">
+                      {Math.round(holdProgress)}%
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
           )}
+        </div>
+
+        {/* Barra de progresso linear abaixo da câmera */}
+        <div className="w-full h-1.5 bg-white/8 rounded-full overflow-hidden -mt-1 mb-1">
+          <div
+            className="h-full bg-gradient-to-r from-[#00d4aa] to-emerald-400 rounded-full"
+            style={{
+              width: `${canCapture && !captures[angle.id] ? holdProgress : captures[angle.id] ? 100 : 0}%`,
+              transition: 'width 0.04s linear',
+            }}
+          />
         </div>
 
         {/* Current angle instruction */}
