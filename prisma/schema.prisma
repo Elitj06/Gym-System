@@ -111,6 +111,9 @@ model Member {
   planId        String
   plan          Plan      @relation(fields: [planId], references: [id])
   
+  // Biometria
+  memberFace    MemberFace?
+
   // Pagamento
   paymentDay    Int       // Dia do mês para pagamento (1-31)
   lastPayment   DateTime?
@@ -355,4 +358,23 @@ model Camera {
   updatedAt   DateTime @updatedAt
 
   @@map("cameras")
+}
+
+// Biometria Facial de Membros (alunos)
+model MemberFace {
+  id          String   @id @default(cuid())
+  memberId    String   @unique
+  member      Member   @relation(fields: [memberId], references: [id])
+
+  faceEmbedding  String
+  trainingImages String[]
+  enrolledAngles String[] @default([])
+  quality        Float    @default(0)
+  lastTrainedAt  DateTime @default(now())
+  isActive       Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("member_faces")
 }

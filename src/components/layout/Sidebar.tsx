@@ -19,6 +19,7 @@ import {
   Video,
   Menu,
   X,
+  Fingerprint,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
@@ -31,6 +32,7 @@ const menuItems = [
   { href: '/espacos', label: 'Espaços', icon: Building2 },
   { href: '/ia', label: 'IA Vision', icon: Brain },
   { href: '/ponto', label: 'Ponto Facial', icon: Clock },
+  { href: '/biometria', label: 'Biometria', icon: Fingerprint },
   { href: '/ranking', label: 'Ranking', icon: Trophy },
   { href: '/cameras', label: 'Câmeras', icon: Video },
   { href: '/relatorios', label: 'Relatórios', icon: BarChart3 },
