@@ -1,9 +1,9 @@
 'use client'
 
 /**
- * BiometricEnrollment — Estilo App Bancário
- * Inspirado em: Nubank, Inter, C6 Bank, Bradesco
- * Fluxo 100% automático — captura quando detecta qualidade suficiente
+ * BiometricEnrollment — Estilo App Bancário (timer-free)
+ * O progresso é calculado diretamente no callback de detecção do MediaPipe
+ * Sem setInterval — sem closures stale — sem bugs de timer
  */
 
 import { useRef, useEffect, useState, useCallback } from 'react'
@@ -32,9 +32,8 @@ const STEPS = [
   { id: 'down',  label: 'Baixo',     hint: 'Abaixe levemente o queixo',             direction: 'down'  as const, icon: '👇' },
 ]
 
-const HOLD_DURATION = 1600   // ms para segurar antes de capturar
-const TICK = 32               // ms entre ticks de progresso
-const QUALITY_TOLERANCE = 400 // ms de tolerância a quedas momentâneas de qualidade
+const HOLD_DURATION   = 1800  // ms com qualidade boa para disparar captura
+const LOSE_TOLERANCE  = 600   // ms de tolerância quando qualidade cai (sem resetar)
 
 // ── Types ────────────────────────────────────────────────────────────────────
 export interface BiometricEnrollmentProps {
@@ -56,34 +55,32 @@ export default function BiometricEnrollment({
 }: BiometricEnrollmentProps) {
   const faceRef = useRef<FaceDetectionRef>(null)
 
-  const [phase,        setPhase]        = useState<Phase>('intro')
-  const [stepIdx,      setStepIdx]      = useState(0)
-  const [captures,     setCaptures]     = useState<Record<string, string>>({})
-  const [holdProgress, setHoldProgress] = useState(0)
-  const [showSuccess,  setShowSuccess]  = useState(false)  // flash verde pós-captura
-  const [saving,       setSaving]       = useState(false)
-  const [errorMsg,     setErrorMsg]     = useState('')
-  const [enrollQuality,setEnrollQuality]= useState(0)
+  const [phase,         setPhase]         = useState<Phase>('intro')
+  const [stepIdx,       setStepIdx]       = useState(0)
+  const [captures,      setCaptures]      = useState<Record<string, string>>({})
+  const [holdProgress,  setHoldProgress]  = useState(0)
+  const [showSuccess,   setShowSuccess]   = useState(false)
+  const [errorMsg,      setErrorMsg]      = useState('')
+  const [enrollQuality, setEnrollQuality] = useState(0)
 
-  // Refs — nunca stale em timers
-  const qualityRef        = useRef<FaceQuality>('none')
-  const stepIdxRef        = useRef(0)
-  const capturesRef       = useRef<Record<string, string>>({})
-  const phaseRef          = useRef<Phase>('intro')
-  const holdStartRef      = useRef<number>(0)
-  const holdingRef        = useRef(false)
-  const lastGoodTimeRef   = useRef<number>(0)  // última vez com qualidade boa
-  const capturingRef      = useRef(false)       // guard: captura em andamento
-  const intervalRef       = useRef<ReturnType<typeof setInterval> | null>(null)
+  // ── Refs — absolutamente tudo que precisa de acesso em callbacks ──────────
+  const phaseRef        = useRef<Phase>('intro')
+  const stepIdxRef      = useRef(0)
+  const capturesRef     = useRef<Record<string, string>>({})
+  const capturingRef    = useRef(false)          // guard duplo de captura
 
-  // Sincronizar refs ↔ state
-  useEffect(() => { stepIdxRef.current = stepIdx },     [stepIdx])
-  useEffect(() => { capturesRef.current = captures },   [captures])
-  useEffect(() => { phaseRef.current = phase },         [phase])
+  // Timing sem setInterval — apenas timestamps puros
+  const firstGoodTimeRef = useRef<number>(0)     // quando começou qualidade boa
+  const lastGoodTimeRef  = useRef<number>(0)     // última frame com qualidade boa
+
+  // Manter refs sincronizados
+  useEffect(() => { phaseRef.current = phase },       [phase])
+  useEffect(() => { stepIdxRef.current = stepIdx },   [stepIdx])
+  useEffect(() => { capturesRef.current = captures }, [captures])
 
   const step = STEPS[stepIdx]
 
-  // ── Captura um frame e avança ───────────────────────────────────────────
+  // ── Captura e avança para próximo ângulo ────────────────────────────────
   const doCapture = useCallback(() => {
     if (capturingRef.current) return
     capturingRef.current = true
@@ -94,6 +91,7 @@ export default function BiometricEnrollment({
     const sid = STEPS[stepIdxRef.current].id
     if (capturesRef.current[sid]) { capturingRef.current = false; return }
 
+    // Registrar captura
     const newCaptures = { ...capturesRef.current, [sid]: img }
     capturesRef.current = newCaptures
     setCaptures(newCaptures)
@@ -101,6 +99,10 @@ export default function BiometricEnrollment({
     // Flash de sucesso
     setShowSuccess(true)
     setHoldProgress(100)
+
+    // Reset timing para próximo ângulo
+    firstGoodTimeRef.current = 0
+    lastGoodTimeRef.current  = 0
 
     setTimeout(() => {
       setShowSuccess(false)
@@ -111,112 +113,66 @@ export default function BiometricEnrollment({
       if (nextIdx < STEPS.length) {
         stepIdxRef.current = nextIdx
         setStepIdx(nextIdx)
-        qualityRef.current = 'none'
-        lastGoodTimeRef.current = 0
-        holdStartRef.current = 0
-        holdingRef.current = false
       }
-    }, 700)
+      // Último ângulo: o useEffect abaixo detecta e salva
+    }, 800)
   }, [])
 
-  // ── Detecta fim de todos os ângulos e salva ─────────────────────────────
+  // ── Detecta conclusão de todos os ângulos ───────────────────────────────
   useEffect(() => {
     if (phase !== 'scanning') return
-    if (Object.keys(captures).length === STEPS.length) {
-      setTimeout(() => saveEnrollment(captures), 700)
+    if (Object.keys(captures).length >= STEPS.length) {
+      setTimeout(() => saveEnrollment(captures), 900)
     }
   }, [captures, phase]) // eslint-disable-line
 
-  // ── Parar timer ─────────────────────────────────────────────────────────
-  const stopHoldTimer = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-      intervalRef.current = null
-    }
-    holdingRef.current = false
-    holdStartRef.current = 0
-    lastGoodTimeRef.current = 0
-    setHoldProgress(0)
-  }, [])
+  // ── handleFaceDetected — roda ~30fps, É o "timer" ──────────────────────
+  // Sem setInterval. O MediaPipe já nos chama a cada frame detectado.
+  // Calculamos o progresso a partir de timestamps puros: sem closure, sem stale.
+  const handleFaceDetected = useCallback((_detected: boolean, q: FaceQuality) => {
+    // Ignorar se não estamos escaneando ou já capturando
+    if (phaseRef.current !== 'scanning' || capturingRef.current) return
 
-  // ── Loop de hold com TOLERÂNCIA a quedas momentâneas de qualidade ───────
-  // Inspirado em apps de banco: não penaliza micro-oscilações do detector
-  const startHoldTimer = useCallback(() => {
-    if (holdingRef.current) return
-    holdingRef.current = true
-    holdStartRef.current = Date.now()
-    lastGoodTimeRef.current = Date.now()
+    // Ignorar se já capturou este ângulo
+    const curStep = STEPS[stepIdxRef.current]
+    if (!curStep || capturesRef.current[curStep.id]) return
 
-    intervalRef.current = setInterval(() => {
-      // Parar se saiu do modo scan ou captura em andamento
-      if (phaseRef.current !== 'scanning' || capturingRef.current) {
-        stopHoldTimer()
-        return
+    const now = Date.now()
+    const isGood = q === 'good' || q === 'excellent'
+
+    if (isGood) {
+      // Primeira frame boa nesta sequência — iniciar contagem
+      if (firstGoodTimeRef.current === 0) {
+        firstGoodTimeRef.current = now
       }
+      lastGoodTimeRef.current = now
 
-      // Verificar se já capturou este ângulo
-      const curStep = STEPS[stepIdxRef.current]
-      if (capturesRef.current[curStep?.id]) {
-        stopHoldTimer()
-        return
-      }
-
-      const now = Date.now()
-      const q = qualityRef.current
-      const isGoodQuality = q === 'good' || q === 'excellent'
-
-      if (isGoodQuality) {
-        // Atualiza timestamp da última boa qualidade
-        lastGoodTimeRef.current = now
-      } else {
-        // Qualidade ruim — verificar tolerância
-        const timeSinceGood = now - lastGoodTimeRef.current
-        if (timeSinceGood > QUALITY_TOLERANCE) {
-          // Perdeu o rosto por tempo demais → resetar
-          stopHoldTimer()
-          return
-        }
-        // Dentro da tolerância: pausa o progresso mas não reseta
-        // (não avança o holdStart, mas também não para o timer)
-        return
-      }
-
-      const elapsed = now - holdStartRef.current
-      const pct = Math.min(100, (elapsed / HOLD_DURATION) * 100)
+      // Calcular progresso
+      const elapsed = now - firstGoodTimeRef.current
+      const pct = Math.min(99, (elapsed / HOLD_DURATION) * 100)
       setHoldProgress(pct)
 
-      if (pct >= 100) {
-        stopHoldTimer()
+      // Atingiu o threshold — capturar!
+      if (elapsed >= HOLD_DURATION) {
         doCapture()
       }
-    }, TICK)
-  }, [doCapture, stopHoldTimer])
+    } else {
+      // Qualidade ruim — verificar tolerância
+      if (lastGoodTimeRef.current === 0) return  // nunca teve qualidade boa
 
-  // ── Callback quando qualidade muda ──────────────────────────────────────
-  const handleFaceDetected = useCallback((_detected: boolean, q: FaceQuality) => {
-    qualityRef.current = q
-    const curStep = STEPS[stepIdxRef.current]
-    const alreadyCaptured = !!capturesRef.current[curStep?.id]
-
-    if (phaseRef.current !== 'scanning' || alreadyCaptured || capturingRef.current) return
-
-    if (q === 'good' || q === 'excellent') {
-      lastGoodTimeRef.current = Date.now()
-      startHoldTimer() // sem efeito se já estiver rodando (holdingRef guard)
+      const timeSinceLast = now - lastGoodTimeRef.current
+      if (timeSinceLast > LOSE_TOLERANCE) {
+        // Perdeu por tempo demais → resetar
+        firstGoodTimeRef.current = 0
+        lastGoodTimeRef.current  = 0
+        setHoldProgress(0)
+      }
+      // Dentro da tolerância: manter progresso visível, não resetar
     }
-    // Quedas de qualidade são gerenciadas com tolerância dentro do interval
-    // Não chamamos stopHoldTimer aqui para evitar resets desnecessários
-  }, [startHoldTimer])
-
-  // Limpar timer ao desmontar ou sair do scan
-  useEffect(() => {
-    if (phase !== 'scanning') stopHoldTimer()
-    return () => stopHoldTimer()
-  }, [phase, stopHoldTimer])
+  }, [doCapture])
 
   // ── Salvar no backend ───────────────────────────────────────────────────
   const saveEnrollment = async (caps: Record<string, string>) => {
-    setSaving(true)
     setPhase('processing')
 
     try {
@@ -257,18 +213,15 @@ export default function BiometricEnrollment({
     } catch (e: any) {
       setErrorMsg(e.message)
       setPhase('error')
-    } finally {
-      setSaving(false)
     }
   }
 
   const reset = () => {
-    stopHoldTimer()
-    capturesRef.current = {}
-    stepIdxRef.current = 0
-    qualityRef.current = 'none'
-    capturingRef.current = false
-    lastGoodTimeRef.current = 0
+    capturesRef.current      = {}
+    stepIdxRef.current       = 0
+    capturingRef.current     = false
+    firstGoodTimeRef.current = 0
+    lastGoodTimeRef.current  = 0
     setCaptures({})
     setStepIdx(0)
     setHoldProgress(0)
@@ -423,7 +376,7 @@ export default function BiometricEnrollment({
 
         {/* Header mínimo */}
         <div className="flex items-center justify-between mb-3">
-          <button onClick={() => { stopHoldTimer(); setPhase('intro'); setCaptures({}); capturesRef.current = {}; setStepIdx(0) }}
+          <button onClick={() => { firstGoodTimeRef.current = 0; lastGoodTimeRef.current = 0; capturingRef.current = false; setPhase('intro'); setCaptures({}); capturesRef.current = {}; setStepIdx(0) }}
             className="p-2 rounded-xl hover:bg-white/5 text-[#8b949e] transition-colors">
             <X className="w-4 h-4" />
           </button>

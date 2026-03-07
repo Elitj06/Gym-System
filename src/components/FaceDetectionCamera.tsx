@@ -213,8 +213,8 @@ const FaceDetectionCamera = forwardRef<FaceDetectionRef, Props>(({
               const dx = Math.abs(b.xCenter - 0.5)
               const dy = Math.abs(b.yCenter - 0.46)
               const q: FaceQuality =
-                area > 0.08 && dx < 0.14 && dy < 0.14 ? 'excellent' :
-                area > 0.035 && dx < 0.25 && dy < 0.25 ? 'good' : 'poor'
+                area > 0.06 && dx < 0.18 && dy < 0.18 ? 'excellent' :
+                area > 0.02 && dx < 0.32 && dy < 0.32 ? 'good' : 'poor'
               setQuality(q)
               cbRef.current?.(true, q)
             }
