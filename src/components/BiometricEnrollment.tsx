@@ -32,8 +32,9 @@ const STEPS = [
   { id: 'down',  label: 'Baixo',     hint: 'Abaixe levemente o queixo',             direction: 'down'  as const, icon: '👇' },
 ]
 
-const HOLD_DURATION = 1400  // ms para segurar antes de capturar
-const TICK = 32              // ms entre ticks de progresso
+const HOLD_DURATION = 1600   // ms para segurar antes de capturar
+const TICK = 32               // ms entre ticks de progresso
+const QUALITY_TOLERANCE = 400 // ms de tolerância a quedas momentâneas de qualidade
 
 // ── Types ────────────────────────────────────────────────────────────────────
 export interface BiometricEnrollmentProps {
@@ -65,13 +66,15 @@ export default function BiometricEnrollment({
   const [enrollQuality,setEnrollQuality]= useState(0)
 
   // Refs — nunca stale em timers
-  const qualityRef     = useRef<FaceQuality>('none')
-  const stepIdxRef     = useRef(0)
-  const capturesRef    = useRef<Record<string, string>>({})
-  const phaseRef       = useRef<Phase>('intro')
-  const holdStartRef   = useRef<number>(0)
-  const holdingRef     = useRef(false)
-  const intervalRef    = useRef<ReturnType<typeof setInterval> | null>(null)
+  const qualityRef        = useRef<FaceQuality>('none')
+  const stepIdxRef        = useRef(0)
+  const capturesRef       = useRef<Record<string, string>>({})
+  const phaseRef          = useRef<Phase>('intro')
+  const holdStartRef      = useRef<number>(0)
+  const holdingRef        = useRef(false)
+  const lastGoodTimeRef   = useRef<number>(0)  // última vez com qualidade boa
+  const capturingRef      = useRef(false)       // guard: captura em andamento
+  const intervalRef       = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Sincronizar refs ↔ state
   useEffect(() => { stepIdxRef.current = stepIdx },     [stepIdx])
@@ -82,11 +85,14 @@ export default function BiometricEnrollment({
 
   // ── Captura um frame e avança ───────────────────────────────────────────
   const doCapture = useCallback(() => {
+    if (capturingRef.current) return
+    capturingRef.current = true
+
     const img = faceRef.current?.capture()
-    if (!img) return
+    if (!img) { capturingRef.current = false; return }
 
     const sid = STEPS[stepIdxRef.current].id
-    if (capturesRef.current[sid]) return   // guard duplo
+    if (capturesRef.current[sid]) { capturingRef.current = false; return }
 
     const newCaptures = { ...capturesRef.current, [sid]: img }
     capturesRef.current = newCaptures
@@ -99,51 +105,83 @@ export default function BiometricEnrollment({
     setTimeout(() => {
       setShowSuccess(false)
       setHoldProgress(0)
+      capturingRef.current = false
 
       const nextIdx = stepIdxRef.current + 1
       if (nextIdx < STEPS.length) {
         stepIdxRef.current = nextIdx
         setStepIdx(nextIdx)
         qualityRef.current = 'none'
+        lastGoodTimeRef.current = 0
+        holdStartRef.current = 0
+        holdingRef.current = false
       }
-      // Se foi o último, saveEnrollment é chamado pelo useEffect abaixo
-    }, 600)
+    }, 700)
   }, [])
 
   // ── Detecta fim de todos os ângulos e salva ─────────────────────────────
   useEffect(() => {
     if (phase !== 'scanning') return
     if (Object.keys(captures).length === STEPS.length) {
-      // Pequeno delay para mostrar o último success flash
       setTimeout(() => saveEnrollment(captures), 700)
     }
   }, [captures, phase]) // eslint-disable-line
 
-  // ── Loop de hold para auto-captura ─────────────────────────────────────
+  // ── Parar timer ─────────────────────────────────────────────────────────
+  const stopHoldTimer = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+    holdingRef.current = false
+    holdStartRef.current = 0
+    lastGoodTimeRef.current = 0
+    setHoldProgress(0)
+  }, [])
+
+  // ── Loop de hold com TOLERÂNCIA a quedas momentâneas de qualidade ───────
+  // Inspirado em apps de banco: não penaliza micro-oscilações do detector
   const startHoldTimer = useCallback(() => {
     if (holdingRef.current) return
     holdingRef.current = true
     holdStartRef.current = Date.now()
+    lastGoodTimeRef.current = Date.now()
 
     intervalRef.current = setInterval(() => {
-      if (phaseRef.current !== 'scanning') {
-        stopHoldTimer()
-        return
-      }
-      // Verificar qualidade atual via ref
-      const q = qualityRef.current
-      if (q !== 'good' && q !== 'excellent') {
-        stopHoldTimer()
-        return
-      }
-      // Verificar se já capturou este ângulo
-      const curStep = STEPS[stepIdxRef.current]
-      if (capturesRef.current[curStep.id]) {
+      // Parar se saiu do modo scan ou captura em andamento
+      if (phaseRef.current !== 'scanning' || capturingRef.current) {
         stopHoldTimer()
         return
       }
 
-      const elapsed = Date.now() - holdStartRef.current
+      // Verificar se já capturou este ângulo
+      const curStep = STEPS[stepIdxRef.current]
+      if (capturesRef.current[curStep?.id]) {
+        stopHoldTimer()
+        return
+      }
+
+      const now = Date.now()
+      const q = qualityRef.current
+      const isGoodQuality = q === 'good' || q === 'excellent'
+
+      if (isGoodQuality) {
+        // Atualiza timestamp da última boa qualidade
+        lastGoodTimeRef.current = now
+      } else {
+        // Qualidade ruim — verificar tolerância
+        const timeSinceGood = now - lastGoodTimeRef.current
+        if (timeSinceGood > QUALITY_TOLERANCE) {
+          // Perdeu o rosto por tempo demais → resetar
+          stopHoldTimer()
+          return
+        }
+        // Dentro da tolerância: pausa o progresso mas não reseta
+        // (não avança o holdStart, mas também não para o timer)
+        return
+      }
+
+      const elapsed = now - holdStartRef.current
       const pct = Math.min(100, (elapsed / HOLD_DURATION) * 100)
       setHoldProgress(pct)
 
@@ -152,16 +190,7 @@ export default function BiometricEnrollment({
         doCapture()
       }
     }, TICK)
-  }, [doCapture])
-
-  const stopHoldTimer = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-      intervalRef.current = null
-    }
-    holdingRef.current = false
-    setHoldProgress(0)
-  }, [])
+  }, [doCapture, stopHoldTimer])
 
   // ── Callback quando qualidade muda ──────────────────────────────────────
   const handleFaceDetected = useCallback((_detected: boolean, q: FaceQuality) => {
@@ -169,12 +198,15 @@ export default function BiometricEnrollment({
     const curStep = STEPS[stepIdxRef.current]
     const alreadyCaptured = !!capturesRef.current[curStep?.id]
 
-    if ((q === 'good' || q === 'excellent') && !alreadyCaptured && phaseRef.current === 'scanning') {
-      startHoldTimer()
-    } else {
-      stopHoldTimer()
+    if (phaseRef.current !== 'scanning' || alreadyCaptured || capturingRef.current) return
+
+    if (q === 'good' || q === 'excellent') {
+      lastGoodTimeRef.current = Date.now()
+      startHoldTimer() // sem efeito se já estiver rodando (holdingRef guard)
     }
-  }, [startHoldTimer, stopHoldTimer])
+    // Quedas de qualidade são gerenciadas com tolerância dentro do interval
+    // Não chamamos stopHoldTimer aqui para evitar resets desnecessários
+  }, [startHoldTimer])
 
   // Limpar timer ao desmontar ou sair do scan
   useEffect(() => {
@@ -235,6 +267,8 @@ export default function BiometricEnrollment({
     capturesRef.current = {}
     stepIdxRef.current = 0
     qualityRef.current = 'none'
+    capturingRef.current = false
+    lastGoodTimeRef.current = 0
     setCaptures({})
     setStepIdx(0)
     setHoldProgress(0)
