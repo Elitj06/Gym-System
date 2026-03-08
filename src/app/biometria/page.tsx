@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Fingerprint, Users, Briefcase, Search, CheckCircle2, XCircle, Shield, RefreshCw, ChevronRight, X } from 'lucide-react'
+import { ScanFace, Users, Briefcase, Search, CheckCircle2, XCircle, Shield, RefreshCw, ChevronRight, X } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
 const BiometricEnrollment = dynamic(() => import('@/components/BiometricEnrollment'), { ssr: false })
@@ -124,7 +124,7 @@ export default function BiometriaPage() {
           <div>
             <h1 className="text-xl sm:text-3xl font-bold text-white flex items-center gap-3">
               <div className="p-2 sm:p-3 bg-gradient-to-br from-[#00d4aa] to-[#0099cc] rounded-xl shadow-lg shadow-[#00d4aa]/20">
-                <Fingerprint className="w-5 h-5 sm:w-8 sm:h-8 text-white" />
+                <ScanFace className="w-5 h-5 sm:w-8 sm:h-8 text-white" />
               </div>
               Biometria Facial
             </h1>
@@ -262,7 +262,7 @@ export default function BiometriaPage() {
 
               {filtered.length === 0 && (
                 <div className="p-10 text-center">
-                  <Fingerprint className="w-10 h-10 text-[#8b949e] mx-auto mb-3" />
+                  <ScanFace className="w-10 h-10 text-[#8b949e] mx-auto mb-3" />
                   <p className="text-[#8b949e] text-sm">Nenhum resultado encontrado</p>
                 </div>
               )}
