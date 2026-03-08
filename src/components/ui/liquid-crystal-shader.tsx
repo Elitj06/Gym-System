@@ -90,16 +90,16 @@ const LiquidCrystalBackground: FC<LiquidCrystalProps> = ({
     }
 
     class Renderer {
-      prog: WebGLProgram;
-      uRes: WebGLUniformLocation;
-      uTime: WebGLUniformLocation;
-      uSpeed: WebGLUniformLocation;
-      uRadii: WebGLUniformLocation;
-      uK: WebGLUniformLocation;
-      buf: WebGLBuffer;
+      prog: any;
+      uRes: any;
+      uTime: any;
+      uSpeed: any;
+      uRadii: any;
+      uK: any;
+      buf: any;
 
       constructor() {
-        const compile = (type: GLenum, src: string) => {
+        const compile = (type: number, src: string) => {
           const s = gl.createShader(type)!;
           gl.shaderSource(s, src);
           gl.compileShader(s);
