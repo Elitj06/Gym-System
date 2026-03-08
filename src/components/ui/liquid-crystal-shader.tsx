@@ -83,11 +83,13 @@ const LiquidCrystalBackground: FC<LiquidCrystalProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const gl = canvas.getContext("webgl2");
-    if (!gl) {
+    const glCtx = canvas.getContext("webgl2");
+    if (!glCtx) {
       setError("WebGL2 not supported");
       return;
     }
+    // Non-null from here — TS doesn't narrow inside class closures
+    const gl: WebGL2RenderingContext = glCtx;
 
     class Renderer {
       prog: any;
