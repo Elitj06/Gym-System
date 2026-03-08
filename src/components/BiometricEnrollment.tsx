@@ -287,7 +287,7 @@ export default function BiometricEnrollment({
             key={cameraKey}
             active={true}
             direction={step.direction}
-            holdDuration={1500}
+            holdDuration={2500}
             onCaptured={handleCaptured}
           />
         </div>

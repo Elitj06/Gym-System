@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ScanFace, Users, Briefcase, Search, CheckCircle2, XCircle, Shield, RefreshCw, ChevronRight, X } from 'lucide-react'
+import { ScanFace, Users, Briefcase, Search, CheckCircle2, XCircle, Shield, RefreshCw, ChevronRight, X, Loader2 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
 const BiometricEnrollment = dynamic(() => import('@/components/BiometricEnrollment'), { ssr: false })
@@ -20,50 +20,60 @@ type Person = {
   lastTrained?: string
 }
 
-// ── Mock data ──────────────────────────────────────────────────────────────
-const MOCK_EMPLOYEES: Person[] = [
-  { id: 'emp1', name: 'Carlos Silva',     role: 'Instrutor',      email: 'carlos@gym.com', status: 'active' },
-  { id: 'emp2', name: 'Ana Costa',        role: 'Recepcionista',  email: 'ana@gym.com',    status: 'active' },
-  { id: 'emp3', name: 'Pedro Almeida',    role: 'Instrutor',      email: 'pedro@gym.com',  status: 'active' },
-  { id: 'emp4', name: 'Maria Santos',     role: 'Administradora', email: 'maria@gym.com',  status: 'active' },
-  { id: 'emp5', name: 'Lucas Oliveira',   role: 'Personal',       email: 'lucas@gym.com',  status: 'active' },
-]
-
-const MOCK_MEMBERS: Person[] = [
-  { id: 'mem1', name: 'Juliana Ferreira', email: 'juli@email.com',  status: 'active' },
-  { id: 'mem2', name: 'Roberto Lima',     email: 'rob@email.com',   status: 'active' },
-  { id: 'mem3', name: 'Fernanda Souza',   email: 'fer@email.com',   status: 'active' },
-  { id: 'mem4', name: 'Marcos Vieira',    email: 'marcos@email.com',status: 'active' },
-  { id: 'mem5', name: 'Patricia Nunes',   email: 'pat@email.com',   status: 'active' },
-  { id: 'mem6', name: 'Diego Martins',    email: 'diego@email.com', status: 'active' },
-  { id: 'mem7', name: 'Camila Rocha',     email: 'cami@email.com',  status: 'active' },
-  { id: 'mem8', name: 'Thiago Barbosa',   email: 'thiago@email.com',status: 'active' },
-]
-
 export default function BiometriaPage() {
   const [tab,        setTab]        = useState<Tab>('employees')
-  const [employees,  setEmployees]  = useState<Person[]>(MOCK_EMPLOYEES)
-  const [members,    setMembers]    = useState<Person[]>(MOCK_MEMBERS)
+  const [employees,  setEmployees]  = useState<Person[]>([])
+  const [members,    setMembers]    = useState<Person[]>([])
   const [search,     setSearch]     = useState('')
   const [selected,   setSelected]   = useState<Person | null>(null)
   const [showPanel,  setShowPanel]  = useState(false)
+  const [loadingList, setLoadingList] = useState(false)
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set())
 
-  const list = tab === 'employees' ? employees : members
-
-  const filtered = list.filter(p =>
-    !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.email.toLowerCase().includes(search.toLowerCase())
-  )
-
-  const enrolledCount = list.filter(p => p.enrolled).length
+  // Fetch real data from API
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoadingList(true)
+      try {
+        if (tab === 'employees') {
+          const res = await fetch('/api/employees')
+          const data = await res.json()
+          if (Array.isArray(data)) {
+            setEmployees(data.map((e: any) => ({
+              id: e.id,
+              name: e.name,
+              role: e.role || '',
+              email: e.email || '',
+              status: e.status || 'active',
+            })))
+          }
+        } else {
+          const res = await fetch('/api/members')
+          const data = await res.json()
+          const list = Array.isArray(data) ? data : data.members || []
+          setMembers(list.map((m: any) => ({
+            id: m.id,
+            name: m.name,
+            email: m.email || '',
+            status: m.status || 'active',
+          })))
+        }
+      } catch (err) {
+        console.error('Erro ao carregar:', err)
+      }
+      setLoadingList(false)
+    }
+    fetchData()
+  }, [tab])
 
   // Fetch enrollment status for visible persons
   useEffect(() => {
+    const list = tab === 'employees' ? employees : members
+    if (list.length === 0) return
+
     const fetchStatuses = async () => {
       const type = tab === 'employees' ? 'employee' : 'member'
-      const targets = tab === 'employees' ? employees : members
-
-      for (const person of targets) {
+      for (const person of list) {
         if (person.enrolled !== undefined) continue
         setLoadingIds(prev => { const s = new Set(prev); s.add(person.id); return s })
         try {
@@ -88,10 +98,14 @@ export default function BiometriaPage() {
         setLoadingIds(prev => { const next = new Set(prev); next.delete(person.id); return next })
       }
     }
-
     fetchStatuses()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab])
+  }, [tab, employees.length, members.length]) // eslint-disable-line
+
+  const list = tab === 'employees' ? employees : members
+  const filtered = list.filter(p =>
+    !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.email.toLowerCase().includes(search.toLowerCase())
+  )
+  const enrolledCount = list.filter(p => p.enrolled).length
 
   const openEnrollment = (person: Person) => {
     setSelected(person)
@@ -129,11 +143,9 @@ export default function BiometriaPage() {
               Biometria Facial
             </h1>
             <p className="text-[#8b949e] mt-1 text-xs sm:text-sm">
-              Cadastro e gerenciamento de biometria para IA e relatórios individuais
+              Cadastro e gerenciamento de biometria facial
             </p>
           </div>
-
-          {/* Stats badge */}
           <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-[#00d4aa]/10 border border-[#00d4aa]/20 rounded-xl">
             <Shield className="w-4 h-4 text-[#00d4aa]" />
             <span className="text-[#00d4aa] text-sm font-semibold">
@@ -163,10 +175,10 @@ export default function BiometriaPage() {
         {/* Tab + Search */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex gap-1 p-1 bg-white/[0.03] border border-white/8 rounded-xl">
-            {([['employees', 'Funcionários', Briefcase], ['members', 'Alunos', Users]] as [Tab, string, any][]).map(([t, label, Icon]) => (
+            {([['employees', 'Funcionarios', Briefcase], ['members', 'Alunos', Users]] as [Tab, string, any][]).map(([t, label, Icon]) => (
               <button
                 key={t}
-                onClick={() => { setTab(t); setSearch('') }}
+                onClick={() => { setTab(t); setSearch(''); setShowPanel(false); setSelected(null) }}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   tab === t
                     ? 'bg-[#00d4aa] text-white shadow-lg shadow-[#00d4aa]/20'
@@ -199,74 +211,82 @@ export default function BiometriaPage() {
           <div className="bg-white/[0.03] border border-white/8 rounded-2xl overflow-hidden">
             <div className="p-4 border-b border-white/8">
               <p className="text-[#8b949e] text-xs font-semibold uppercase tracking-wider">
-                {filtered.length} {tab === 'employees' ? 'funcionários' : 'alunos'}
+                {filtered.length} {tab === 'employees' ? 'funcionarios' : 'alunos'}
               </p>
             </div>
-            <div className="divide-y divide-white/5 max-h-[600px] overflow-y-auto">
-              {filtered.map(person => {
-                const loading = loadingIds.has(person.id)
-                const isSelected = selected?.id === person.id && showPanel
-                return (
-                  <div
-                    key={person.id}
-                    onClick={() => openEnrollment(person)}
-                    className={`flex items-center gap-3 p-3 sm:p-4 hover:bg-white/[0.03] cursor-pointer transition-colors group ${
-                      isSelected ? 'bg-[#00d4aa]/5 border-l-2 border-l-[#00d4aa]' : ''
-                    }`}
-                  >
-                    {/* Avatar */}
-                    <div className="relative">
-                      <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#00d4aa]/20 to-[#0099cc]/10 border border-[#00d4aa]/20 flex items-center justify-center font-bold text-[#00d4aa] text-sm flex-shrink-0">
-                        {person.name.charAt(0)}
-                      </div>
-                      {/* Enrollment indicator */}
-                      {!loading && person.enrolled !== undefined && (
-                        <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-[#0a0f14] flex items-center justify-center ${
-                          person.enrolled ? 'bg-[#00d4aa]' : 'bg-[#2d333b]'
-                        }`}>
-                          {person.enrolled
-                            ? <CheckCircle2 className="w-2.5 h-2.5 text-white" />
-                            : <XCircle className="w-2.5 h-2.5 text-[#8b949e]" />
-                          }
-                        </div>
-                      )}
-                      {loading && (
-                        <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#00d4aa]/20 border-2 border-[#0a0f14] flex items-center justify-center">
-                          <RefreshCw className="w-2.5 h-2.5 text-[#00d4aa] animate-spin" />
-                        </div>
-                      )}
-                    </div>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-white text-sm truncate">{person.name}</p>
-                        {person.enrolled && (
-                          <span className="px-1.5 py-0.5 bg-[#00d4aa]/15 text-[#00d4aa] rounded-full text-xs font-medium flex-shrink-0">
-                            {person.enrollQuality || 0}%
-                          </span>
+            {loadingList ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-6 h-6 text-[#00d4aa] animate-spin" />
+                <span className="text-[#8b949e] text-sm ml-2">Carregando...</span>
+              </div>
+            ) : (
+              <div className="divide-y divide-white/5 max-h-[600px] overflow-y-auto">
+                {filtered.map(person => {
+                  const loading = loadingIds.has(person.id)
+                  const isSelected = selected?.id === person.id && showPanel
+                  return (
+                    <div
+                      key={person.id}
+                      onClick={() => openEnrollment(person)}
+                      className={`flex items-center gap-3 p-3 sm:p-4 hover:bg-white/[0.03] cursor-pointer transition-colors group ${
+                        isSelected ? 'bg-[#00d4aa]/5 border-l-2 border-l-[#00d4aa]' : ''
+                      }`}
+                    >
+                      <div className="relative">
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#00d4aa]/20 to-[#0099cc]/10 border border-[#00d4aa]/20 flex items-center justify-center font-bold text-[#00d4aa] text-sm flex-shrink-0">
+                          {person.name.charAt(0)}
+                        </div>
+                        {!loading && person.enrolled !== undefined && (
+                          <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-[#0a0f14] flex items-center justify-center ${
+                            person.enrolled ? 'bg-[#00d4aa]' : 'bg-[#2d333b]'
+                          }`}>
+                            {person.enrolled
+                              ? <CheckCircle2 className="w-2.5 h-2.5 text-white" />
+                              : <XCircle className="w-2.5 h-2.5 text-[#8b949e]" />
+                            }
+                          </div>
+                        )}
+                        {loading && (
+                          <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#00d4aa]/20 border-2 border-[#0a0f14] flex items-center justify-center">
+                            <RefreshCw className="w-2.5 h-2.5 text-[#00d4aa] animate-spin" />
+                          </div>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        {person.role && <span className="text-[#8b949e] text-xs">{person.role}</span>}
-                        {person.role && <span className="text-[#8b949e] text-xs">·</span>}
-                        <span className={`text-xs ${person.enrolled ? 'text-[#00d4aa]' : 'text-amber-400'}`}>
-                          {loading ? 'Verificando...' : person.enrolled ? 'Biometria ativa' : 'Sem biometria'}
-                        </span>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-white text-sm truncate">{person.name}</p>
+                          {person.enrolled && (
+                            <span className="px-1.5 py-0.5 bg-[#00d4aa]/15 text-[#00d4aa] rounded-full text-xs font-medium flex-shrink-0">
+                              {person.enrollQuality || 0}%
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {person.role && <span className="text-[#8b949e] text-xs">{person.role}</span>}
+                          {person.role && <span className="text-[#8b949e] text-xs">·</span>}
+                          <span className={`text-xs ${person.enrolled ? 'text-[#00d4aa]' : 'text-amber-400'}`}>
+                            {loading ? 'Verificando...' : person.enrolled ? 'Biometria ativa' : 'Sem biometria'}
+                          </span>
+                        </div>
                       </div>
+
+                      <ChevronRight className={`w-4 h-4 flex-shrink-0 transition-colors ${isSelected ? 'text-[#00d4aa]' : 'text-[#8b949e] group-hover:text-white'}`} />
                     </div>
+                  )
+                })}
 
-                    <ChevronRight className={`w-4 h-4 flex-shrink-0 transition-colors ${isSelected ? 'text-[#00d4aa]' : 'text-[#8b949e] group-hover:text-white'}`} />
+                {filtered.length === 0 && !loadingList && (
+                  <div className="p-10 text-center">
+                    <ScanFace className="w-10 h-10 text-[#8b949e] mx-auto mb-3" />
+                    <p className="text-[#8b949e] text-sm">
+                      {list.length === 0 ? 'Nenhum registro encontrado no banco' : 'Nenhum resultado para a busca'}
+                    </p>
                   </div>
-                )
-              })}
-
-              {filtered.length === 0 && (
-                <div className="p-10 text-center">
-                  <ScanFace className="w-10 h-10 text-[#8b949e] mx-auto mb-3" />
-                  <p className="text-[#8b949e] text-sm">Nenhum resultado encontrado</p>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Enrollment panel */}
